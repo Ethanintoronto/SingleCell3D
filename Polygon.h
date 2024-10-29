@@ -10,6 +10,8 @@ private:
 
     double perimeter_;
 
+    std::vector<Vertex*> vertices_;
+
     std::vector<Edge*> edges_;
 
     std::array<double, 3> polygonForce_;
@@ -22,8 +24,10 @@ private:
 
     void updateArea();
 
+    void updatePerimeter();
+
 public:
-    explicit Polygon(std::vector<Edge*> edges, int id);
+    explicit Polygon(std::vector<Vertex*> vertices, std::vector<Edge*> edges, int id);
 
     const int getId() const;
 
@@ -32,6 +36,8 @@ public:
     const double getPerimeter() const;
 
     const std::vector<Edge*>& getEdges() const;
+
+    const std::vector<Vertex*>& getVertices() const;
 
     const std::array<double, 3>& getAreaVector() const;
 
