@@ -12,10 +12,6 @@ const double Cell::getArea() const{
     return area_;
 }
 
-const double Cell::getArea() const{
-    return area_;
-}
-
 const double Cell::getVolume() const{
     return volume_;
 }
