@@ -86,7 +86,7 @@ std::array<double, 3> Simulation::dAdr(Vertex* current, Vertex* prev, Vertex* ne
     std::array<double, 3> dAdr = {dAdx, dAdy, dAdz};
     return dAdr; 
 }
-std::array<double, 3> dVdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, std::array<double,3> cellCenter, int N_p, int N_c){
+std::array<double, 3> Simulation::dVdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, std::array<double,3> cellCenter, int N_p, int N_c){
     double x_k = current->getPos()[0];
     double y_k = current->getPos()[1];
     double z_k = current->getPos()[2];
