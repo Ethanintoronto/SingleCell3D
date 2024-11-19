@@ -1,7 +1,6 @@
 #pragma once
 #include "Vertex.h"
 #include "Edge.h"
-#include <vector>
 class Polygon{
 private:
     int id_;

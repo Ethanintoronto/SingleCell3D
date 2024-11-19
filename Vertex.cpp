@@ -13,15 +13,19 @@ const int Vertex::getId() const{
     return id_;
 }
 
-void Vertex::setPos(std::array<double, 3>& pos){
+void Vertex::setPos(std::array<double, 3> pos){
     pos_ = pos;
 }
-void Vertex::setForce(std::array<double, 3>& force){
+void Vertex::setForce(std::array<double, 3> force){
     force_ = force;
 }
 
 void Vertex::setId(int id){
     id_ = id;
+}
+void Vertex::updateHist(){
+    posHistory_.push_back(pos_);
+    forceHistory_.push_back(force_);
 }
 
 
