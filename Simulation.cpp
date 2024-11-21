@@ -1,16 +1,33 @@
 #include "Simulation.h"
 #include <cmath>
-Simulation::Simulation(std::vector<Cell*> cells, std::vector<Vertex*> vertices, double timestep, int numTimesteps, double Kv, double Ka, double V0, double A0, double eta, int log): cells_(cells), vertices_(vertices), timestep_(timestep),numTimesteps_(numTimesteps), Kv_(Kv), Ka_(Ka), V0_(V0), A0_(A0), eta_(eta), log_(log),time_(0){
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <iomanip>
+Simulation::Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, double timestep, int numTimesteps, double Kv, double Ka, double V0, double A0, double eta, int log, bool write): cells_(cells), polygons_(polygons), edges_(edges), vertices_(vertices), timestep_(timestep),numTimesteps_(numTimesteps), Kv_(Kv), Ka_(Ka), V0_(V0), A0_(A0), eta_(eta), log_(log),time_(0),write_(write){
     Run();
 }
 void Simulation::Run(){
+    printMaxForce();
+    if (write_){
+        writeVTK();
+    }
+
     for (int i=0;i<numTimesteps_;i++){
+        std::cout<<"Cell Area: "<<cells_[0]->getArea()<<"\n";
+        std::cout<<"Cell Volume: "<<cells_[0]->getVolume()<<"\n";
         update();
+        printMaxForce();
+        time_ += 1;
+        if (write_){
+            writeVTK();
+        }
     }
 }
 void Simulation::updateForces(){
-    int prev_i;
-    int next_i; 
+    int prev_k;
+    int next_k; 
     std::array<double, 3> pos;
     for (int i = 0; i<cells_.size();i++){
         for (int j = 0;  j<cells_[i]->getPolygons().size(); j++){
@@ -19,21 +36,21 @@ void Simulation::updateForces(){
                 Vertex* curr = polygon->getVertices()[k];
                 std::array<double,3> force =  {0,0,0};
                 if (k==0){
-                    prev_i = polygon->getVertices().size()-1;
-                    next_i = i+1;
+                    prev_k = polygon->getVertices().size()-1;
+                    next_k = k+1;
                 }
-                else if (k==polygon->getVertices().size()){
-                    prev_i = k+1;
-                    next_i = 0;
+                else if (k==polygon->getVertices().size()-1){
+                    prev_k = k-1;
+                    next_k = 0;
                 }
                 else{
-                    prev_i = k-1;
-                    next_i = k+1; 
+                    prev_k = k-1;
+                    next_k = k+1; 
                 }
-                std::array<double,3> areaDeriv = dAdr(curr,polygon->getVertices()[prev_i],polygon->getVertices()[next_i],polygon->getCentroid(),cells_[i]->getCentroid(),polygon->getVertices().size());
-                std::array<double,3> volDeriv = dVdr(curr, polygon->getVertices()[prev_i], polygon->getVertices()[next_i],polygon->getCentroid(), cells_[i]->getCentroid(), polygon->getVertices().size(), cells_[i]->getVertices().size());
-                for (int i =0; i<3; i++){
-                    force[i] += 2*(cells_[i]->getArea()-A0_)*areaDeriv[i] + 2*(cells_[i]->getVolume()-V0_)*volDeriv[i];
+                std::array<double,3> areaDeriv = dAdr(curr,polygon->getVertices()[prev_k],polygon->getVertices()[next_k],polygon->getCentroid(),cells_[i]->getCentroid(),polygon->getVertices().size());
+                std::array<double,3> volDeriv = dVdr(curr, polygon->getVertices()[prev_k], polygon->getVertices()[next_k],polygon->getCentroid(), cells_[i]->getCentroid(), polygon->getVertices().size(), cells_[i]->getVertices().size());
+                for (int l =0; l<3; l++){
+                    force[l] -= 2*Ka_*(cells_[i]->getArea()-A0_)*areaDeriv[l] + 0*Kv_*(cells_[i]->getVolume()-V0_)*volDeriv[l];
                 }
                 polygon->getVertices()[k]->setForce(force);
             }
@@ -62,6 +79,63 @@ void Simulation::performTimeStep(){
         }
         vertex->setPos(newpos);
     }
+}
+
+// Function to write simulation data in VTK format
+void Simulation::writeVTK() {
+    std::ostringstream filename;
+    filename << "Single_cell_sim_" << std::setw(3) << std::setfill('0') << time_ << ".vtk";
+    std::ofstream vtkFile(filename.str());
+
+    if (!vtkFile.is_open()) {
+        std::cerr << "Error opening the VTK file for writing!" << std::endl;
+        return;
+    }
+
+    // Write the header for VTK file
+    vtkFile << "# vtk DataFile Version 3.0\n";
+    vtkFile << "Simulation Data at timestep " << time_ << "\n";
+    vtkFile << "ASCII\n";
+    vtkFile << "DATASET POLYDATA\n";
+
+    // Write vertices
+    vtkFile << "POINTS " << vertices_.size() << " float\n";
+    for (const auto& vertex : vertices_) {
+        const auto& pos = vertex->getPos();
+        vtkFile << pos[0] << " " << pos[1] << " " << pos[2] << "\n";
+    }
+
+    // Write edges
+    vtkFile << "LINES " << edges_.size() << " " << edges_.size() * 3 << "\n";
+    for (const auto& edge : edges_) {
+        vtkFile << "2 " << edge->getVertices()[0]->getId() << " "
+                << edge->getVertices()[1]->getId() << "\n";
+    }
+
+    // Write polygons
+    vtkFile << "POLYGONS " << polygons_.size() << " " << polygons_.size() * 5 << "\n";
+    for (const auto& polygon : polygons_) {
+        vtkFile << polygon->getVertices().size();
+        for (const auto& vertex : polygon->getVertices()) {
+            vtkFile << " " << vertex->getId();
+        }
+        vtkFile << "\n";
+    }
+
+    // Close the VTK file
+    vtkFile.close();
+    std::cout << "VTK file for timestep " << time_ << " has been written successfully.\n";
+}
+
+void Simulation::printMaxForce(){
+    // Find the max force:
+    double max_force = 0.;
+    for (auto& vertex : vertices_){
+        if (std::sqrt(std::pow(vertex->getForce()[0],2)+std::pow(vertex->getForce()[1],2)+std::pow(vertex->getForce()[2],2)) > max_force){
+            max_force = std::sqrt(std::pow(vertex->getForce()[0],2)+std::pow(vertex->getForce()[1],2)+std::pow(vertex->getForce()[2],2)); 
+        }
+    }
+    std::cout<<"Max force: "<<max_force<<"\n";
 }
 
 std::array<double, 3> Simulation::dAdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, std::array<double,3> cellCenter, int N_p){
