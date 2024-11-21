@@ -1,7 +1,7 @@
 #include "Edge.h"
 #include <cmath>
 
-Edge::Edge(std::array<Vertex*,2> vertices, int id): vertices_(vertices), id_(id), length_(0.), centroid_({0.,0.,0.}) {
+Edge::Edge(std::array<Vertex*,2> vertices, int id): vertices_(vertices), id_(id) {
     update();
 }
 
@@ -40,7 +40,14 @@ void Edge::updateLength() {
 }
 
 void Edge::updateCentroid(){
+    const auto& pos1 = vertices_[0]->getPos();
+    const auto& pos2 = vertices_[1]->getPos();
 
+    //Calculate centroid using the average position of the two vertices:
+    //Must change to implement periodic boundary conditions
+    for (int i = 0; i<3;i++){
+        centroid_[i] = (pos2[i]+pos1[i])/2;
+    }
 }
 
 void Edge::update(){
