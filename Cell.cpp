@@ -75,10 +75,9 @@ void Cell::updateVolume(){
     volume_ = newVolume/6;
 }
 void Cell::updateArea(){
-    double newArea = 0; 
+    area_ = 0.; 
     for (const auto& polygon : polygons_){
-        newArea+=polygon->getArea();
-    area_ = newArea;
+        area_+=polygon->getArea();
     }
 }
 
