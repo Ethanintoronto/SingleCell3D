@@ -1,5 +1,6 @@
 #pragma once
 #include "Cell.h"
+#include <string>
 class Simulation{
 private:
     int time_;
@@ -22,7 +23,12 @@ private:
     void performTimeStep();
     void writeVTK();
     void printMaxForce();
+    void writeMaxForce();
+    void writeVolume();
+    void writeArea();
+    void writeCellCentroid();
     void update();
+    std::string convertDouble(double val);
     std::array<double, 3> dAdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, std::array<double,3> cellCenter, int N_p);
     std::array<double, 3> dVdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, std::array<double,3> cellCenter, int N_p, int N_c);
 
