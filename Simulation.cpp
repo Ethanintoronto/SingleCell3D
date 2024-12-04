@@ -3,29 +3,41 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <string>
 #include <iomanip>
+#include <filesystem>
+#include <algorithm>
 Simulation::Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, double timestep, int numTimesteps, double Kv, double Ka, double V0, double A0, double eta, int log, bool write): cells_(cells), polygons_(polygons), edges_(edges), vertices_(vertices), timestep_(timestep),numTimesteps_(numTimesteps), Kv_(Kv), Ka_(Ka), V0_(V0), A0_(A0), eta_(eta), log_(log),time_(0),write_(write){
     Run();
 }
 void Simulation::Run(){
-    printMaxForce();
-    if (write_){
+    if (write_ && time_%log_==0){
         writeVTK();
+        writeMaxForce();
     }
 
     for (int i=0;i<numTimesteps_;i++){
-        std::cout<<"Cell Area: "<<cells_[0]->getArea()<<"\n";
-        std::cout<<"Cell Volume: "<<cells_[0]->getVolume()<<"\n";
+        //std::cout<<"Cell Area: "<<cells_[0]->getArea()<<"\n";
+        //std::cout<<"Cell Volume: "<<cells_[0]->getVolume()<<"\n";
         update();
-        printMaxForce();
+        if (write_ && time_%log_==0){
+            writeVolume();
+            writeArea();
+            writeCellCentroid();
+        }
+        //printMaxForce();
+        //std::cout<<"Cell Centroid: ("<<cells_[0]->getCentroid()[0]<<","<<cells_[0]->getCentroid()[1]<<","<<cells_[0]->getCentroid()[2]<<")\n";
         time_ += 1;
-        if (write_){
+        if (write_ && time_%log_==0){
             writeVTK();
+            writeMaxForce();
         }
     }
 }
 void Simulation::updateForces(){
+    //Reset all forces
+    for (auto& v :vertices_){
+        v->setForce({0.,0.,0.});
+    }
     int prev_k;
     int next_k; 
     std::array<double, 3> pos;
@@ -34,7 +46,7 @@ void Simulation::updateForces(){
             Polygon* polygon = cells_[i]->getPolygons()[j];
             for (int k =  0; k<polygon->getVertices().size();k++){
                 Vertex* curr = polygon->getVertices()[k];
-                std::array<double,3> force =  {0,0,0};
+                std::array<double,3> force =  curr->getForce();
                 if (k==0){
                     prev_k = polygon->getVertices().size()-1;
                     next_k = k+1;
@@ -50,7 +62,7 @@ void Simulation::updateForces(){
                 std::array<double,3> areaDeriv = dAdr(curr,polygon->getVertices()[prev_k],polygon->getVertices()[next_k],polygon->getCentroid(),cells_[i]->getCentroid(),polygon->getVertices().size());
                 std::array<double,3> volDeriv = dVdr(curr, polygon->getVertices()[prev_k], polygon->getVertices()[next_k],polygon->getCentroid(), cells_[i]->getCentroid(), polygon->getVertices().size(), cells_[i]->getVertices().size());
                 for (int l =0; l<3; l++){
-                    force[l] -= 2*Ka_*(cells_[i]->getArea()-A0_)*areaDeriv[l] + 0*Kv_*(cells_[i]->getVolume()-V0_)*volDeriv[l];
+                    force[l] -= 2*Ka_*(cells_[i]->getArea()-A0_)*areaDeriv[l] + 2*Kv_*(cells_[i]->getVolume()-V0_)*volDeriv[l];
                 }
                 polygon->getVertices()[k]->setForce(force);
             }
@@ -83,8 +95,19 @@ void Simulation::performTimeStep(){
 
 // Function to write simulation data in VTK format
 void Simulation::writeVTK() {
+    std::ostringstream dataDir;
+    dataDir << "data/vtk/Single_cell_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    std::cout << dataDir.str()<<"\n";
+    if (!std::filesystem::exists(dataDir.str())){
+        if(std::filesystem::create_directory(dataDir.str())){
+            std::cout <<"Datadir created successfully\n";
+        }
+        else{
+            std::cout <<"Failed to create directory\n";
+        }
+    }
     std::ostringstream filename;
-    filename << "Single_cell_sim_" << std::setw(3) << std::setfill('0') << time_ << ".vtk";
+    filename << dataDir.str()<<"/Single_cell_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_)<<"_"<< std::setw(3) << std::setfill('0') << time_ << ".vtk";
     std::ofstream vtkFile(filename.str());
 
     if (!vtkFile.is_open()) {
@@ -138,6 +161,142 @@ void Simulation::printMaxForce(){
     std::cout<<"Max force: "<<max_force<<"\n";
 }
 
+void Simulation::writeMaxForce(){
+    // Find the max force:
+    double max_force = 0.;
+    int max_id = 0;
+    int curr_id = 0;
+    for (auto& vertex : vertices_){
+        if (std::sqrt(std::pow(vertex->getForce()[0],2)+std::pow(vertex->getForce()[1],2)+std::pow(vertex->getForce()[2],2)) > max_force){
+            max_force = std::sqrt(std::pow(vertex->getForce()[0],2)+std::pow(vertex->getForce()[1],2)+std::pow(vertex->getForce()[2],2)); 
+            max_id = curr_id;
+        }
+        curr_id++;
+    }
+
+    //Open file:
+    std::ostringstream dataDir;
+    dataDir << "data/Single_cell_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    if (!std::filesystem::exists(dataDir.str())){
+        if(std::filesystem::create_directory(dataDir.str())){
+            std::cout <<"Datadir created successfully\n";
+        }
+        else{
+            std::cout <<"Failed to create directory\n";
+        }
+    }
+    std::ostringstream filename;
+    filename << dataDir.str()<<"/Single_cell_MaxForce_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_)<< ".txt";
+    std::ofstream forceFile;
+    if (time_ ==0){
+        forceFile.open(filename.str(), std::ios::trunc);
+    }
+    else {
+        forceFile.open(filename.str(), std::ios::app);
+    }
+    if (!forceFile.is_open()) {
+        std::cerr << "Error opening the force file for writing!" << std::endl;
+        return;
+    }
+
+    forceFile<<time_*timestep_<<","<< max_force<<","<< vertices_[max_id]->getForce()[0]<<","<< vertices_[max_id]->getForce()[1]<<","<< vertices_[max_id]->getForce()[2]<<"\n";
+    // Close the file
+    forceFile.close();
+}
+void Simulation::writeVolume(){
+    //Open file:
+    std::ostringstream dataDir;
+    dataDir << "data/Single_cell_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    if (!std::filesystem::exists(dataDir.str())){
+        if(std::filesystem::create_directory(dataDir.str())){
+            std::cout <<"Datadir created successfully\n";
+        }
+        else{
+            std::cout <<"Failed to create directory\n";
+        }
+    }
+    std::ostringstream filename;
+    filename << dataDir.str()<<"/Single_cell_Volume_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_)<< ".txt";
+    std::ofstream volumeFile;
+    if (time_ ==0){
+        volumeFile.open(filename.str(), std::ios::trunc);
+    }
+    else {
+        volumeFile.open(filename.str(), std::ios::app);
+    }
+    if (!volumeFile.is_open()) {
+        std::cerr << "Error opening the force file for writing!" << std::endl;
+        return;
+    }
+    volumeFile<<time_*timestep_<<","<< cells_[0]->getVolume()<<"\n";
+    // Close the file
+    volumeFile.close();
+}
+
+void Simulation::writeArea(){
+    //Open file:
+    std::ostringstream dataDir;
+    dataDir << "data/Single_cell_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    if (!std::filesystem::exists(dataDir.str())){
+        if(std::filesystem::create_directory(dataDir.str())){
+            std::cout <<"Datadir created successfully\n";
+        }
+        else{
+            std::cout <<"Failed to create directory\n";
+        }
+    }
+    std::ostringstream filename;
+    filename << dataDir.str()<<"/Single_cell_Area_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_)<< ".txt";
+    std::ofstream areaFile;
+    if (time_ ==0){
+        areaFile.open(filename.str(), std::ios::trunc);
+    }
+    else {
+        areaFile.open(filename.str(), std::ios::app);
+    }
+
+    if (!areaFile.is_open()) {
+        std::cerr << "Error opening the force file for writing!" << std::endl;
+        return;
+    }
+    areaFile<<time_*timestep_<<","<< cells_[0]->getArea()<<"\n";
+    // Close the file
+    areaFile.close();
+}
+
+void Simulation::writeCellCentroid(){
+    //Open file:
+    std::ostringstream dataDir;
+    dataDir << "data/Single_cell_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    if (!std::filesystem::exists(dataDir.str())){
+        if(std::filesystem::create_directory(dataDir.str())){
+            std::cout <<"Datadir created successfully\n";
+        }
+        else{
+            std::cout <<"Failed to create directory\n";
+        }
+    }
+    std::ostringstream filename;
+    filename << dataDir.str()<<"/Single_cell_Centroid_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_)<< ".txt";
+
+    std::ofstream centroidFile;
+    if (time_ ==0){
+        centroidFile.open(filename.str(), std::ios::trunc);
+    }
+    else {
+        centroidFile.open(filename.str(), std::ios::app);
+    }
+
+    if (!centroidFile.is_open()) {
+        std::cerr << "Error opening the force file for writing!" << std::endl;
+        return;
+    }
+    centroidFile<<time_*timestep_<<","<< cells_[0]->getCentroid()[0]<<","<< cells_[0]->getCentroid()[1]<<","<< cells_[0]->getCentroid()[2]<<"\n";
+    // Close the file
+    centroidFile.close();
+}
+
+
 std::array<double, 3> Simulation::dAdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, std::array<double,3> cellCenter, int N_p){
     double x_k = current->getPos()[0];
     double y_k = current->getPos()[1];
@@ -187,4 +346,18 @@ std::array<double, 3> Simulation::dVdr(Vertex* current, Vertex* prev, Vertex* ne
 
     std::array<double, 3> dVdr = {dVdx, dVdy, dVdz};
     return dVdr;
+}
+
+std::string Simulation::convertDouble(double val){
+    std::string str = std::to_string(val);  // Convert double to string
+    
+    // Remove trailing zeros
+    str.erase(str.find_last_not_of('0') + 1, std::string::npos);
+    
+    // Remove decimal point if it's the last character
+    if (str.back() == '.') {
+        str.pop_back();
+    }
+    std::replace(str.begin(), str.end(), '.', 'p');
+    return str;
 }
