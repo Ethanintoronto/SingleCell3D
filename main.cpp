@@ -7,7 +7,7 @@
 int main() {
     // Cube vertices: a cube with side length 1 centered at the origin
     std::array<std::array<double, 3>, 8> cubeVertices = {{
-        {{-0.5, -0.5, -0.5}}, {{ 0.5, -0.5, -0.5}}, {{ 0.5,  0.5, -0.5}}, {{-0.5,  0.5, -0.5}},
+        {{-0.5, -0.5, -0.5}}, {{ -0.5, 0.5, -0.5}}, {{ 0.5,  0.5, -0.5}}, {{0.5,  -0.5, -0.5}},
         {{-0.5, -0.5,  0.5}}, {{ 0.5, -0.5,  0.5}}, {{ 0.5,  0.5,  0.5}}, {{-0.5,  0.5,  0.5}}
     }};
     
@@ -24,7 +24,7 @@ int main() {
     std::array<std::array<int, 2>, 12> edgeIndices = {{
         {{0, 1}}, {{1, 2}}, {{2, 3}}, {{3, 0}}, // Bottom face edges
         {{4, 5}}, {{5, 6}}, {{6, 7}}, {{7, 4}}, // Top face edges
-        {{0, 4}}, {{1, 5}}, {{2, 6}}, {{3, 7}}  // Vertical edges
+        {{0, 4}}, {{3, 5}}, {{2, 6}}, {{1, 7}}  // Vertical edges
     }};
 
     for (int i = 0; i < 12; ++i) {
@@ -37,13 +37,13 @@ int main() {
     // Define each face as a polygon with its vertices and edges
     std::array<std::array<int, 4>, 6> polygonVIndices = {{
         {{0, 1, 2, 3}}, {{4, 5, 6, 7}}, // Bottom and Top faces
-        {{0, 1, 5, 4}}, {{1, 2, 6, 5}}, // Side faces
-        {{2, 3, 7, 6}}, {{3, 0, 4, 7}}  // Side faces
+        {{0, 3, 5, 4}}, {{3, 2, 6, 5}}, // Side faces
+        {{2, 1, 7, 6}}, {{1, 0, 4, 7}}  // Side faces
     }};
     std::array<std::array<int, 4>, 6> polygonEIndices = {{
         {{0, 1, 2, 3}}, {{4, 5, 6, 7}}, // Bottom and Top faces
-        {{0, 9, 4, 8}}, {{1, 10, 5, 9}}, // Side faces
-        {{2, 11, 6, 10}}, {{3, 8, 7, 11}}  // Side faces
+        {{3, 9, 4, 8}}, {{2, 10, 5, 9}}, // Side faces
+        {{1, 11, 6, 10}}, {{0, 8, 7, 11}}  // Side faces
     }};
 
     for (int i = 0; i < 6; ++i) {
@@ -65,12 +65,12 @@ int main() {
     std::vector<Cell*> cells;
     cells.push_back(new Cell(vertices, polygons, 1));
     double eta = 1.0;
-    double timestep = 0.01;
-    int numTimesteps = 20000;
+    double timestep = 0.001;
+    int numTimesteps = 500;
     double Kv = 10.0;
     double Ka = 1.0;
-    double V0 = 1.5;
-    double A0 = 6;
+    double V0 = 0.970299;
+    double A0 = 5.8806;
     int log = 1; 
     bool write = false;
     std::cout << "Starting Simulation\n"; 
@@ -80,6 +80,7 @@ int main() {
     for (auto v : vertices) delete v;
     for (auto e : edges) delete e;
     for (auto p : polygons) delete p;
+    for (auto c : cells) delete c;
 
     return 0;
 }
