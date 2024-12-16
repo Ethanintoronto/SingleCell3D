@@ -1,0 +1,16 @@
+# Object files
+*.o
+*.obj
+
+# Binaries
+*.exe
+*.out
+*.app
+
+# vs code files
+.vscode/
+
+# data
+*.vtk
+data/
+plots/
