@@ -4,12 +4,23 @@
 #include "Polygon.h"
 #include "Cell.h"
 #include <iostream>
+//FUTURE UPDATE USE PYVISTA TO GENERATE INITIAL GEOMERTRY
 int main() {
+    
     // Cube vertices: a cube with side length 1 centered at the origin
     std::array<std::array<double, 3>, 8> cubeVertices = {{
         {{-0.5, -0.5, -0.5}}, {{ -0.5, 0.5, -0.5}}, {{ 0.5,  0.5, -0.5}}, {{0.5,  -0.5, -0.5}},
         {{-0.5, -0.5,  0.5}}, {{ 0.5, -0.5,  0.5}}, {{ 0.5,  0.5,  0.5}}, {{-0.5,  0.5,  0.5}}
     }};
+    
+    /*
+    // HY MAKING CUBE OF 1x1x1 with corner at 0,0,0
+    // Cube vertices: a cube with side length 1 centered at the origin
+    std::array<std::array<double, 3>, 8> cubeVertices = {{
+        {{0, 0, 0}}, {{0, 1, 0}}, {{1,  1, 0}}, {{1,  0, 0}},
+        {{0, 0, 1}}, {{1, 0, 1}}, {{1,  1, 1}}, {{0,  1, 1}}
+    }};
+    */
     
     // Step 1: Create the vertices for the cube
     std::vector<Vertex*> vertices;
@@ -65,13 +76,13 @@ int main() {
     std::vector<Cell*> cells;
     cells.push_back(new Cell(vertices, polygons, 1));
     double eta = 1.0;
-    double timestep = 0.001;
-    int numTimesteps = 500;
-    double Kv = 10.0;
+    double timestep = 0.005; //HY uses 0.005
+    int numTimesteps = 500; //HY using 1000
+    double Kv = 10.0; 
     double Ka = 1.0;
-    double V0 = 0.970299;
-    double A0 = 5.8806;
-    int log = 1; 
+    double V0 = 3.048625; //HY using cube of length 1.4
+    double A0 = 12.615;
+    int log = 10; //HY using 10
     bool write = false;
     std::cout << "Starting Simulation\n"; 
     Simulation sim(cells, polygons, edges, vertices, timestep, numTimesteps, Kv, Ka, V0, A0, eta, log, write); 
