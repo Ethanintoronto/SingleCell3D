@@ -26,7 +26,6 @@ void Edge::setId(int id){
 }
 
 void Edge::updateLength() {
-    // Assuming getPos() returns const std::array<double, 3>&
     const auto& pos1 = vertices_[0]->getPos(); // Using const reference to avoid copying
     const auto& pos2 = vertices_[1]->getPos(); // Using const reference to avoid copying
 

@@ -52,9 +52,9 @@ void Cell::updateVolume(){
     double newVolume = 0; 
     for (const auto& polygon : polygons_){
         std::array<double,3> polyCenter = polygon->getCentroid(); 
-        double ci[3] = {0,0,0};
-        double cj[3] = {0,0,0};
-        double cc[3] = {0,0,0};
+        double ci[3] = {0,0,0}; //vector from the cell centroid to the first edge vertex 
+        double cj[3] = {0,0,0}; //vector from the cell centroid to the second edge vertex
+        double cc[3] = {0,0,0}; //vector from the cell centroid to the polygon center
         for (const auto& edge : polygon->getEdges()){
             std::array<double, 3> pos1 = edge->getVertices()[0]->getPos();
             std::array<double, 3> pos2 = edge->getVertices()[1]->getPos();
@@ -67,6 +67,8 @@ void Cell::updateVolume(){
             cc[0] = polyCenter[0]-centroid_[0];
             cc[1] = polyCenter[1]-centroid_[1];
             cc[2] = polyCenter[2]-centroid_[2];
+        //Taking the triple product of the three vectors to compute the volume of the
+        //tetrahedron with vertices at the cell center, face center, and edges.
         newVolume += std::abs((ci[1]*cj[2]-ci[2]*cj[1])*cc[0]);
         newVolume += std::abs((ci[2]*cj[0]-ci[0]*cj[2])*cc[1]);
         newVolume += std::abs((ci[0]*cj[1]-ci[1]*cj[0])*cc[2]);

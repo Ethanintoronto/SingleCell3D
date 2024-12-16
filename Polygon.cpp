@@ -90,6 +90,8 @@ void Polygon::updateArea(){
     for (const auto& edge : edges_){
         std::array<double, 3> pos1 = edge->getVertices()[0]->getPos();
         std::array<double, 3> pos2 = edge->getVertices()[1]->getPos();
+
+        //Form two vectors from the polygon center to the edge vertices. 
         ci[0] = pos1[0]-centroid_[0];
         cj[0] = pos2[0]-centroid_[0];
 
@@ -98,6 +100,8 @@ void Polygon::updateArea(){
 
         ci[2] = pos1[2]-centroid_[2];
         cj[2] = pos2[2]-centroid_[2];
+
+        //Take the cross product of the two vectors to get the parallelogram area vector  
         areaVectorX = (ci[1]*cj[2]-ci[2]*cj[1]);
         areaVectorY = (ci[2]*cj[0]-ci[0]*cj[2]);
         areaVectorZ = (ci[0]*cj[1]-ci[1]*cj[0]);
@@ -105,6 +109,8 @@ void Polygon::updateArea(){
         areaVector_[0] += areaVectorX;
         areaVector_[1] += areaVectorY;
         areaVector_[2] += areaVectorZ;
+        
+        //Take half the norm of the area vector to get the triangular area
         area_ += 0.5*std::sqrt(std::pow(areaVectorX,2)+std::pow(areaVectorY,2)+std::pow(areaVectorZ,2));
     }
 }
