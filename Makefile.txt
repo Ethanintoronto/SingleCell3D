@@ -1,0 +1,15 @@
+# Compiler and flags
+CXX = g++
+CXXFLAGS = -std=c++17 -Wall -Wextra -O2
+
+# Target and source files
+TARGET = main.exe
+SRC = main.cpp Vertex.cpp Edge.cpp Polygon.cpp Cell.cpp Simulation.cpp
+
+# Build target
+$(TARGET): $(SRC)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SRC)
+
+# Clean target
+clean:
+	rm -f $(TARGET)
