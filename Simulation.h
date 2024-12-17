@@ -8,6 +8,7 @@ private:
     int numTimesteps_; 
     double Kv_;
     double Ka_;
+    double gamma_;
     double V0_;
     double A0_;
     double eta_;
@@ -33,5 +34,5 @@ private:
     std::array<double, 3> dVdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, std::array<double,3> cellCenter, int N_p, int N_c);
 
 public:
-    explicit Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, double timestep, int numTimesteps, double Kv, double Ka, double V0, double A0, double eta,int log, bool write);
+    explicit Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, double timestep, int numTimesteps, double Kv, double Ka, double gamma, double V0, double A0, double eta,int log, bool write);
 };
