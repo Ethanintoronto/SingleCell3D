@@ -80,12 +80,13 @@ int main() {
     int numTimesteps = 500; //HY using 1000
     double Kv = 10.0; 
     double Ka = 1.0;
+    double gamma = 1.0;
     double V0 = 3.048625; //HY using cube of length 1.4
     double A0 = 12.615;
-    int log = 10; //HY using 10
-    bool write = false;
+    int log = 1; //HY using 10
+    bool write = true;
     std::cout << "Starting Simulation\n"; 
-    Simulation sim(cells, polygons, edges, vertices, timestep, numTimesteps, Kv, Ka, V0, A0, eta, log, write); 
+    Simulation sim(cells, polygons, edges, vertices, timestep, numTimesteps, Kv, Ka, gamma, V0, A0, eta, log, write); 
 
     // Cleanup dynamically allocated memory
     for (auto v : vertices) delete v;

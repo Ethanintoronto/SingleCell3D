@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <filesystem>
 #include <algorithm>
-Simulation::Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, double timestep, int numTimesteps, double Kv, double Ka, double V0, double A0, double eta, int log, bool write): cells_(cells), polygons_(polygons), edges_(edges), vertices_(vertices), timestep_(timestep),numTimesteps_(numTimesteps), Kv_(Kv), Ka_(Ka), V0_(V0), A0_(A0), eta_(eta), log_(log),time_(0),write_(write){
+Simulation::Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, double timestep, int numTimesteps, double Kv, double Ka, double gamma, double V0, double A0, double eta, int log, bool write): cells_(cells), polygons_(polygons), edges_(edges), vertices_(vertices), timestep_(timestep),numTimesteps_(numTimesteps), Kv_(Kv), Ka_(Ka), gamma_(gamma), V0_(V0), A0_(A0), eta_(eta), log_(log),time_(0),write_(write){
     Run();
 }
 void Simulation::Run(){
@@ -16,18 +16,12 @@ void Simulation::Run(){
     }
 
     for (int i=0;i<numTimesteps_;i++){
-        //std::cout<<"Cell Area: "<<cells_[0]->getArea()<<"\n";
-        //std::cout<<"Cell Volume: "<<cells_[0]->getVolume()<<"\n";
-        //std::cout  << "Energy: " << Kv_*std::pow((cells_[0]->getVolume()-V0_),2) + Ka_*std::pow((cells_[0]->getArea()-A0_),2)<<"\n";
-        //std::cout << "Velocity: " << eta_ *cells_[0]->getVertices()[0]->getForce()[0]<<"\n";
         update();
         if (write_ && time_%log_==0){
             writeVolume();
             writeArea();
             writeCellCentroid();
         }
-        //printMaxForce();
-        //std::cout<<"Cell Centroid: ("<<cells_[0]->getCentroid()[0]<<","<<cells_[0]->getCentroid()[1]<<","<<cells_[0]->getCentroid()[2]<<")\n";
         time_ += 1;
         if (write_ && time_%log_==0){
             writeVTK();
@@ -95,11 +89,16 @@ void Simulation::updateForces(){
                 next_k = (k+1)%polygon->getVertices().size();
                 std::array<double,3> dAdr_k = dAdr(curr,polygon->getVertices()[prev_k],polygon->getVertices()[next_k],polygon->getCentroid(),cells_[i]->getCentroid(),polygon->getVertices().size());
                 std::array<double,3> dVdr_k = dVdr(curr, polygon->getVertices()[prev_k], polygon->getVertices()[next_k],polygon->getCentroid(), cells_[i]->getCentroid(), polygon->getVertices().size(), cells_[i]->getVertices().size());
+
                 for (int l = 0;l<3;l++){
                     dAdr_k[l] = (dA_inner[l] + dAdr_k[l])/4;
                     dVdr_k[l] = (dV_inner[l] + dVdr_k[l])/6;
                 }
-                
+                if (j==0){
+                    for (int l = 0; l<3; l++){
+                        force[l] -= gamma_*dAdr_k[l]; 
+                    }
+                }
                 for (int l =0; l<3; l++){
                     force[l] -= 2*Ka_*(cells_[i]->getArea()-A0_)*dAdr_k[l] + 2*Kv_*(cells_[i]->getVolume()-V0_)*dVdr_k[l];
                 }
@@ -135,7 +134,7 @@ void Simulation::performTimeStep(){
 // Function to write simulation data in VTK format
 void Simulation::writeVTK() {
     std::ostringstream dataDir;
-    dataDir << "data/vtk/Single_cell_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    dataDir << "data/vtk/Single_cell_gamma_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
     if (!std::filesystem::exists(dataDir.str())){
         if(std::filesystem::create_directory(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
@@ -145,7 +144,7 @@ void Simulation::writeVTK() {
         }
     }
     std::ostringstream filename;
-    filename << dataDir.str()<<"/Single_cell_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_)<<"_"<< std::setw(3) << std::setfill('0') << time_ << ".vtk";
+    filename << dataDir.str()<<"/Single_cell_gamma_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_)<<"_"<< std::setw(3) << std::setfill('0') << time_ << ".vtk";
     std::ofstream vtkFile(filename.str());
 
     if (!vtkFile.is_open()) {
@@ -213,7 +212,7 @@ void Simulation::writeMaxForce(){
 
     //Open file:
     std::ostringstream dataDir;
-    dataDir << "data/Single_cell_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    dataDir << "data/Single_cell_gamma_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
     if (!std::filesystem::exists(dataDir.str())){
         if(std::filesystem::create_directory(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
@@ -243,7 +242,7 @@ void Simulation::writeMaxForce(){
 void Simulation::writeVolume(){
     //Open file:
     std::ostringstream dataDir;
-    dataDir << "data/Single_cell_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    dataDir << "data/Single_cell_gamma_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
     if (!std::filesystem::exists(dataDir.str())){
         if(std::filesystem::create_directory(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
@@ -273,7 +272,7 @@ void Simulation::writeVolume(){
 void Simulation::writeArea(){
     //Open file:
     std::ostringstream dataDir;
-    dataDir << "data/Single_cell_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    dataDir << "data/Single_cell_gamma_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
     if (!std::filesystem::exists(dataDir.str())){
         if(std::filesystem::create_directory(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
@@ -304,7 +303,7 @@ void Simulation::writeArea(){
 void Simulation::writeCellCentroid(){
     //Open file:
     std::ostringstream dataDir;
-    dataDir << "data/Single_cell_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    dataDir << "data/Single_cell_gamma_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
     if (!std::filesystem::exists(dataDir.str())){
         if(std::filesystem::create_directory(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
