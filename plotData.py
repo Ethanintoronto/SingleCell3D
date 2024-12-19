@@ -4,8 +4,8 @@ import os
 
 dir  = os.path.dirname(os.path.abspath(__file__))
 os.chdir(dir)
-base = "_V0_2p744_A0_11p76_timestep_0p001"
-run = "\\data\\Single_cell_sim"+base+"\\"
+base = "_V0_1_A0_6_timestep_0p005"
+run = "\\data\\Single_cell_gamma_sim"+base+"\\"
 tests =  ["Area", "Centroid", "MaxForce", "Volume"]
 plot = ["Single_cell_"+x+base+".txt" for x in tests]
 filenames = [dir + run + file for file in plot] 
@@ -27,9 +27,9 @@ for index, file in enumerate(filenames):
         plt.ylabel(labels[i])
         plt.title(labels[i]+base)
         plt.legend()
-        if not os.path.exists("plots\\Single_cell_sim"+base+"\\"):
-            os.makedirs("plots\\Single_cell_sim"+base)
-        plt.savefig("plots\\Single_cell_sim"+base+"\\"+labels[i])
+        if not os.path.exists("plots\\Single_cell_gamma_sim"+base+"\\"):
+            os.makedirs("plots\\Single_cell_gamma_sim"+base)
+        plt.savefig("plots\\Single_cell_gamma_sim"+base+"\\"+labels[i])
 
 plt.show()
 
