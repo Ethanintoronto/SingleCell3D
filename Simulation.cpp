@@ -30,6 +30,7 @@ void Simulation::Run(){
     }
 }
 void Simulation::updateForces(){
+    const double pi = 3.14159265358979323846;
     //Reset all forces
     for (auto& v :vertices_){
         v->setForce({0.,0.,0.}); //reset force on each vertex
@@ -96,7 +97,12 @@ void Simulation::updateForces(){
                 }
                 if (j==0){
                     for (int l = 0; l<3; l++){
-                        force[l] -= gamma_*dAdr_k[l]; 
+                        force[l] -= gamma_*std::pow(std::sin(pi*time_/25),2)*dAdr_k[l]; 
+                    }
+                }
+                if (j==1){
+                    for (int l = 0; l<3; l++){
+                        force[l] -= gamma_*(1-std::pow(std::sin(pi*time_/25),2))*dAdr_k[l]; 
                     }
                 }
                 for (int l =0; l<3; l++){
