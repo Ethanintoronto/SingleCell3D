@@ -141,10 +141,18 @@ void Simulation::writeVTK() {
             std::cout <<"Failed to create directory\n";
         }
     }
+    else if (time_==0){
+        std::filesystem::remove_all(dataDir.str());
+        if(std::filesystem::create_directory(dataDir.str())){
+            std::cout <<"Datadir created successfully\n";
+        }
+        else{
+            std::cout <<"Failed to create directory\n";
+        }
+    }
     std::ostringstream filename;
     filename << dataDir.str()<<"/Single_cell_sim_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_)<<"_"<< std::setw(3) << std::setfill('0') << time_ << ".vtk";
-    std::ofstream vtkFile(filename.str());
-
+    std::ofstream vtkFile(filename.str(), std::ios::trunc);
     if (!vtkFile.is_open()) {
         std::cerr << "Error opening the VTK file for writing!" << std::endl;
         return;
