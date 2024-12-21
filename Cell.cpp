@@ -1,6 +1,6 @@
 #include "Cell.h"
 #include <cmath>
-Cell::Cell(std::vector<Vertex*> vertices, std::vector<Polygon*> polygons, int id): vertices_(vertices), polygons_(polygons), id_(id), area_(0.), centroid_({0.,0.,0.}), volume_(0.){
+Cell::Cell(std::vector<Vertex*> vertices, std::vector<Polygon*> polygons, int id, double V0, double A0): vertices_(vertices), polygons_(polygons), id_(id), V0_(V0), A0_(A0), Kv_(10.), area_(0.), centroid_({0.,0.,0.}), volume_(0.){
     update();
 }
 
@@ -15,6 +15,19 @@ const double Cell::getArea() const{
 const double Cell::getVolume() const{
     return volume_;
 }
+
+const double Cell::getKv() const{
+    return Kv_;
+}
+
+const double Cell::getV0() const{
+    return V0_;
+}
+
+const double Cell::getA0() const{
+    return A0_;
+}
+
 const std::vector<Vertex*>& Cell::getVertices() const{
     return vertices_;
 }
@@ -29,6 +42,18 @@ const std::array<double, 3>& Cell::getCentroid() const{
 
 void Cell::setId(int id){
     id_ = id;
+}
+
+void Cell::setKv(double Kv){
+    Kv_ = Kv;
+}
+
+void Cell::setV0(double V0){
+    V0_ = V0;
+}
+
+void Cell::setA0(double A0){
+    A0_ = A0;
 }
 
 void Cell::updateCentroid(){
