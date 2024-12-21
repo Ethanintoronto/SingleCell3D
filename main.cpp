@@ -73,8 +73,6 @@ int main() {
     }
 
     // Step 4: Create the cell
-    std::vector<Cell*> cells;
-    cells.push_back(new Cell(vertices, polygons, 1));
     double eta = 1.0;
     double timestep = 0.005; //HY uses 0.005
     int numTimesteps = 500; //HY using 1000
@@ -84,8 +82,10 @@ int main() {
     double A0 = 12.615;
     int log = 10; //HY using 10
     bool write = false;
+    std::vector<Cell*> cells;
+    cells.push_back(new Cell(vertices, polygons, 0, V0, A0));
     std::cout << "Starting Simulation\n"; 
-    Simulation sim(cells, polygons, edges, vertices, timestep, numTimesteps, Kv, Ka, V0, A0, eta, log, write); 
+    Simulation sim(cells, polygons, edges, vertices, timestep, numTimesteps, eta, log, write); 
 
     // Cleanup dynamically allocated memory
     for (auto v : vertices) delete v;
