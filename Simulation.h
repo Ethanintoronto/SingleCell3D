@@ -25,8 +25,9 @@ private:
     void writeCellCentroid();
     void update();
     std::string convertDouble(double val);
-    std::array<double, 3> dAdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, std::array<double,3> cellCenter, int N_p);
+    std::array<double, 3> dAdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, int N_p);
     std::array<double, 3> dVdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, std::array<double,3> cellCenter, int N_p, int N_c);
+    std::array<double, 3> dAShoeLace(Vertex* prev, Vertex* next, int faceNorm);
 
 public:
     explicit Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, double timestep, int numTimesteps, double eta, int log, bool write);
