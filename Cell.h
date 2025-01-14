@@ -16,6 +16,7 @@ private:
     void updateVolume();
     void updateArea();
     void updateCentroid();
+    void checkPolygonOrientations();
 public:
     explicit Cell(std::vector<Vertex*> vertices, std::vector<Polygon*> polygons, int id, double V0, double A0);
     const double getVolume() const;
