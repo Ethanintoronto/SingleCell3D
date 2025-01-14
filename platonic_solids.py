@@ -43,7 +43,8 @@ def write_polyhedron_to_vtk(solid_name, file_path):
             vtk_file.write(f"{' '.join(map(str, vertex))}\n")
 
         # Write polygons (faces)
-        vtk_file.write(f"POLYGONS {len(faces)} {len(faces) * FV+1}\n")
+        print(FV+1)
+        vtk_file.write(f"POLYGONS {len(faces)} {len(faces) * (FV+1)}\n")
         for face in faces:
             vtk_file.write(f"{FV} {' '.join(map(str, face))}\n")
 
