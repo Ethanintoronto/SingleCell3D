@@ -101,15 +101,15 @@ void Simulation::updateForces(){
                     dAdr_k[l] = (dA_inner[l] + dAdr_k[l])/4; 
                     dVdr_k[l] = (dV_inner[l] + dVdr_k[l])/6;
                 }
-                if (j==0){
-                    for (int l = 0; l<3; l++){
-                        force[l] -= polygon->getGamma()*std::pow(std::sin(pi*time_/25),2)*dAdr_k[l]; 
-                    }
+                double phase = 0;
+                if (polygon->getGamma()>0){
+                    phase = std::pow(std::sin(pi*time_/25),2);
+                } 
+                else if (polygon->getGamma()<0){
+                    phase = std::pow(std::cos(pi*time_/25), 2);
                 }
-                if (j==1){
-                    for (int l = 0; l<3; l++){
-                        force[l] -= polygon->getGamma()*(1-std::pow(std::sin(pi*time_/25),2))*dAdr_k[l]; 
-                    }
+                for (int l = 0; l<3; l++){
+                    force[l] -= polygon->getGamma()*phase*dAdr_k[l]; 
                 }
                 for (int l =0; l<3; l++){
                     force[l] -= 2*polygon->getKa()*(cell->getArea()-cell->getA0())*dAdr_k[l] + 2*cell->getKv()*(cell->getVolume()-cell->getV0())*dVdr_k[l];
