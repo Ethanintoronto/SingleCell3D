@@ -9,11 +9,13 @@ private:
 
     double perimeter_;
 
+    double Ka_;
+
+    double gamma_;
+
     std::vector<Vertex*> vertices_;
 
     std::vector<Edge*> edges_;
-
-    std::array<double, 3> polygonForce_;
 
     std::array<double, 3> areaVector_;
 
@@ -34,6 +36,8 @@ public:
 
     const double getPerimeter() const;
 
+    const double getKa() const;
+
     const std::vector<Edge*>& getEdges() const;
 
     const std::vector<Vertex*>& getVertices() const;
@@ -42,7 +46,13 @@ public:
 
     const std::array<double, 3>& getCentroid() const;
 
+    const double getGamma() const;
+
+    void setGamma(double gamma);
+
     void setId(int id);
+
+    void setKa(double Ka);
 
     void update();
     

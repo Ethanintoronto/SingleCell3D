@@ -6,7 +6,9 @@
 #include <iomanip>
 #include <filesystem>
 #include <algorithm>
-Simulation::Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, double timestep, int numTimesteps, double Kv, double Ka, double gamma, double V0, double A0, double eta, int log, bool write): cells_(cells), polygons_(polygons), edges_(edges), vertices_(vertices), timestep_(timestep),numTimesteps_(numTimesteps), Kv_(Kv), Ka_(Ka), gamma_(gamma), V0_(V0), A0_(A0), eta_(eta), log_(log),time_(0),write_(write){
+#include <ctime>
+#include <iomanip>
+Simulation::Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, double timestep, int numTimesteps, double eta, int log, bool write): cells_(cells), polygons_(polygons), edges_(edges), vertices_(vertices), timestep_(timestep),numTimesteps_(numTimesteps), eta_(eta), log_(log),time_(0),write_(write){
     Run();
 }
 void Simulation::Run(){
@@ -45,7 +47,6 @@ void Simulation::updateForces(){
         //Reset the derivatives
         dV_inner = {0,0,0};
         dA_inner = {0,0,0};
-
         double Cx_0 = cell->getCentroid()[0];
         double Cy_0 = cell->getCentroid()[1];
         double Cz_0 = cell->getCentroid()[2];
@@ -81,34 +82,39 @@ void Simulation::updateForces(){
     int next_k; 
     std::array<double, 3> pos;
     for (int i = 0; i<cells_.size();i++){
-        for (int j = 0;  j<cells_[i]->getPolygons().size(); j++){
-            Polygon* polygon = cells_[i]->getPolygons()[j];
+        Cell* cell = cells_[i];
+        for (int j = 0;  j<cell->getPolygons().size(); j++){
+            Polygon* polygon = cell->getPolygons()[j];
             for (int k =  0; k<polygon->getVertices().size();k++){
                 Vertex* curr = polygon->getVertices()[k];
                 std::array<double,3> force =  curr->getForce();
-                prev_k = (k-1)%polygon->getVertices().size();
+                if (k == 0){
+                    prev_k = polygon->getVertices().size()-1;
+                }
+                else{
+                    prev_k = k-1;
+                }
                 next_k = (k+1)%polygon->getVertices().size();
-                std::array<double,3> dAdr_k = dAdr(curr,polygon->getVertices()[prev_k],polygon->getVertices()[next_k],polygon->getCentroid(),cells_[i]->getCentroid(),polygon->getVertices().size());
-                std::array<double,3> dVdr_k = dVdr(curr, polygon->getVertices()[prev_k], polygon->getVertices()[next_k],polygon->getCentroid(), cells_[i]->getCentroid(), polygon->getVertices().size(), cells_[i]->getVertices().size());
-
+                std::array<double,3> dAdr_k = dAdr(curr,polygon->getVertices()[prev_k],polygon->getVertices()[next_k],polygon->getCentroid(),polygon->getVertices().size());
+                std::array<double,3> dVdr_k = dVdr(curr, polygon->getVertices()[prev_k], polygon->getVertices()[next_k],polygon->getCentroid(), cell->getCentroid(), polygon->getVertices().size(), cell->getVertices().size());
                 for (int l = 0;l<3;l++){
-                    dAdr_k[l] = (dA_inner[l] + dAdr_k[l])/4;
+                    dAdr_k[l] = (dA_inner[l] + dAdr_k[l])/4; 
                     dVdr_k[l] = (dV_inner[l] + dVdr_k[l])/6;
                 }
                 if (j==0){
                     for (int l = 0; l<3; l++){
-                        force[l] -= gamma_*std::pow(std::sin(pi*time_/25),2)*dAdr_k[l]; 
+                        force[l] -= polygon->getGamma()*std::pow(std::sin(pi*time_/25),2)*dAdr_k[l]; 
                     }
                 }
                 if (j==1){
                     for (int l = 0; l<3; l++){
-                        force[l] -= gamma_*(1-std::pow(std::sin(pi*time_/25),2))*dAdr_k[l]; 
+                        force[l] -= polygon->getGamma()*(1-std::pow(std::sin(pi*time_/25),2))*dAdr_k[l]; 
                     }
                 }
                 for (int l =0; l<3; l++){
-                    force[l] -= 2*Ka_*(cells_[i]->getArea()-A0_)*dAdr_k[l] + 2*Kv_*(cells_[i]->getVolume()-V0_)*dVdr_k[l];
+                    force[l] -= 2*polygon->getKa()*(cell->getArea()-cell->getA0())*dAdr_k[l] + 2*cell->getKv()*(cell->getVolume()-cell->getV0())*dVdr_k[l];
                 }
-                polygon->getVertices()[k]->setForce(force);
+                curr->setForce(force);
             }
         }
     }
@@ -140,9 +146,18 @@ void Simulation::performTimeStep(){
 // Function to write simulation data in VTK format
 void Simulation::writeVTK() {
     std::ostringstream dataDir;
-    dataDir << "data/vtk/Single_cell_gamma_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    dataDir << "data/vtk/"<<getDate()<<"/"<<getDate()<<"_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_);
     if (!std::filesystem::exists(dataDir.str())){
-        if(std::filesystem::create_directory(dataDir.str())){
+        if(std::filesystem::create_directories(dataDir.str())){
+            std::cout <<"Datadir created successfully\n";
+        }
+        else{
+            std::cout <<"Failed to create directory\n";
+        }
+    }
+    else if (time_==0){
+        std::filesystem::remove_all(dataDir.str());
+        if(std::filesystem::create_directories(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
         }
         else{
@@ -150,9 +165,8 @@ void Simulation::writeVTK() {
         }
     }
     std::ostringstream filename;
-    filename << dataDir.str()<<"/Single_cell_gamma_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_)<<"_"<< std::setw(3) << std::setfill('0') << time_ << ".vtk";
-    std::ofstream vtkFile(filename.str());
-
+    filename << dataDir.str()<<"/"<<getDate()<<"_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_)<<"_"<< std::setw(3) << std::setfill('0') << time_ << ".vtk";
+    std::ofstream vtkFile(filename.str(), std::ios::trunc);
     if (!vtkFile.is_open()) {
         std::cerr << "Error opening the VTK file for writing!" << std::endl;
         return;
@@ -179,7 +193,7 @@ void Simulation::writeVTK() {
     }
 
     // Write polygons
-    vtkFile << "POLYGONS " << polygons_.size() << " " << polygons_.size() * 5 << "\n";
+    vtkFile << "POLYGONS " << polygons_.size() << " " << polygons_.size() * (polygons_[0]->getVertices().size()+1) << "\n";
     for (const auto& polygon : polygons_) {
         vtkFile << polygon->getVertices().size();
         for (const auto& vertex : polygon->getVertices()) {
@@ -195,7 +209,7 @@ void Simulation::writeVTK() {
 void Simulation::printMaxForce(){
     // Find the max force:
     double max_force = 0.;
-    for (auto& vertex : vertices_){
+    for (const auto& vertex : vertices_){
         if (std::sqrt(std::pow(vertex->getForce()[0],2)+std::pow(vertex->getForce()[1],2)+std::pow(vertex->getForce()[2],2)) > max_force){
             max_force = std::sqrt(std::pow(vertex->getForce()[0],2)+std::pow(vertex->getForce()[1],2)+std::pow(vertex->getForce()[2],2)); 
         }
@@ -206,21 +220,32 @@ void Simulation::printMaxForce(){
 void Simulation::writeMaxForce(){
     // Find the max force:
     double max_force = 0.;
-    int max_id = 0;
-    int curr_id = 0;
+    double max_forcex = 0;
+    double max_forcey = 0;
+    double max_forcez = 0;
     for (auto& vertex : vertices_){
         if (std::sqrt(std::pow(vertex->getForce()[0],2)+std::pow(vertex->getForce()[1],2)+std::pow(vertex->getForce()[2],2)) > max_force){
             max_force = std::sqrt(std::pow(vertex->getForce()[0],2)+std::pow(vertex->getForce()[1],2)+std::pow(vertex->getForce()[2],2)); 
-            max_id = curr_id;
         }
-        curr_id++;
+
+        if (std::abs(vertex->getForce()[0])>max_forcex){
+            max_forcex = std::abs(vertex->getForce()[0]);
+        }
+
+        if (std::abs(vertex->getForce()[1])>max_forcey){
+            max_forcey = std::abs(vertex->getForce()[0]);
+        }
+
+        if (std::abs(vertex->getForce()[2])>max_forcez){
+            max_forcez = std::abs(vertex->getForce()[0]);
+        }
     }
 
     //Open file:
     std::ostringstream dataDir;
-    dataDir << "data/Single_cell_gamma_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_);
     if (!std::filesystem::exists(dataDir.str())){
-        if(std::filesystem::create_directory(dataDir.str())){
+        if(std::filesystem::create_directories(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
         }
         else{
@@ -228,7 +253,7 @@ void Simulation::writeMaxForce(){
         }
     }
     std::ostringstream filename;
-    filename << dataDir.str()<<"/Single_cell_MaxForce_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_)<< ".txt";
+    filename << dataDir.str()<<"/Single_cell_MaxForce_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_)<< ".txt";
     std::ofstream forceFile;
     if (time_ ==0){
         forceFile.open(filename.str(), std::ios::trunc);
@@ -241,16 +266,16 @@ void Simulation::writeMaxForce(){
         return;
     }
 
-    forceFile<<time_*timestep_<<","<< max_force<<","<< vertices_[max_id]->getForce()[0]<<","<< vertices_[max_id]->getForce()[1]<<","<< vertices_[max_id]->getForce()[2]<<"\n";
+    forceFile<<time_*timestep_<<","<< max_force<<","<< max_forcex<<","<< max_forcey<<","<< max_forcez<<"\n";
     // Close the file
     forceFile.close();
 }
 void Simulation::writeVolume(){
     //Open file:
     std::ostringstream dataDir;
-    dataDir << "data/Single_cell_gamma_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_);
     if (!std::filesystem::exists(dataDir.str())){
-        if(std::filesystem::create_directory(dataDir.str())){
+        if(std::filesystem::create_directories(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
         }
         else{
@@ -258,7 +283,7 @@ void Simulation::writeVolume(){
         }
     }
     std::ostringstream filename;
-    filename << dataDir.str()<<"/Single_cell_Volume_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_)<< ".txt";
+    filename << dataDir.str()<<"/Single_cell_Volume_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_)<< ".txt";
     std::ofstream volumeFile;
     if (time_ ==0){
         volumeFile.open(filename.str(), std::ios::trunc);
@@ -278,9 +303,9 @@ void Simulation::writeVolume(){
 void Simulation::writeArea(){
     //Open file:
     std::ostringstream dataDir;
-    dataDir << "data/Single_cell_gamma_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_);
     if (!std::filesystem::exists(dataDir.str())){
-        if(std::filesystem::create_directory(dataDir.str())){
+        if(std::filesystem::create_directories(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
         }
         else{
@@ -288,7 +313,7 @@ void Simulation::writeArea(){
         }
     }
     std::ostringstream filename;
-    filename << dataDir.str()<<"/Single_cell_Area_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_)<< ".txt";
+    filename << dataDir.str()<<"/Single_cell_Area_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_)<< ".txt";
     std::ofstream areaFile;
     if (time_ ==0){
         areaFile.open(filename.str(), std::ios::trunc);
@@ -309,9 +334,9 @@ void Simulation::writeArea(){
 void Simulation::writeCellCentroid(){
     //Open file:
     std::ostringstream dataDir;
-    dataDir << "data/Single_cell_gamma_sim_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_);
+    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_);
     if (!std::filesystem::exists(dataDir.str())){
-        if(std::filesystem::create_directory(dataDir.str())){
+        if(std::filesystem::create_directories(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
         }
         else{
@@ -319,7 +344,7 @@ void Simulation::writeCellCentroid(){
         }
     }
     std::ostringstream filename;
-    filename << dataDir.str()<<"/Single_cell_Centroid_V0_"<<convertDouble(V0_)<<"_A0_"<<convertDouble(A0_)<<"_timestep_"<<convertDouble(timestep_)<< ".txt";
+    filename << dataDir.str()<<"/Single_cell_Centroid_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_)<< ".txt";
 
     std::ofstream centroidFile;
     if (time_ ==0){
@@ -339,7 +364,7 @@ void Simulation::writeCellCentroid(){
 }
 
 
-std::array<double, 3> Simulation::dAdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, std::array<double,3> cellCenter, int N_p){
+std::array<double, 3> Simulation::dAdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, int N_p){
     double x_k = current->getPos()[0];
     double y_k = current->getPos()[1];
     double z_k = current->getPos()[2];
@@ -359,9 +384,46 @@ std::array<double, 3> Simulation::dAdr(Vertex* current, Vertex* prev, Vertex* ne
     double dAdx =  (2*x_k*(std::pow(Py_0, 2) - 2*Py_0*y_km1 + std::pow(Pz_0, 2) - 2*Pz_0*z_km1 + std::pow(y_km1, 2) + std::pow(z_km1, 2)) + x_km1*(2*Py_0*y_k + 2*Py_0*y_km1 + 2*Pz_0*z_k + 2*Pz_0*z_km1 - 2*y_k*y_km1 - 2*z_k*z_km1 - 2*std::pow(Py_0, 2) - 2*std::pow(Pz_0, 2)) - Px_0*(2*Py_0*y_k - 2*Py_0*y_km1 + 2*Pz_0*z_k - 2*Pz_0*z_km1 - 2*y_k*y_km1 - 2*z_k*z_km1 + 2*std::pow(y_km1, 2) + 2*std::pow(z_km1, 2)))/std::sqrt(std::pow(y_k, 2)*std::pow(z_km1, 2) + std::pow(y_km1, 2)*std::pow(z_k, 2) + std::pow(Px_0, 2)*(std::pow(y_k, 2) - 2*y_k*y_km1 + std::pow(y_km1, 2) + std::pow(z_k, 2) - 2*z_k*z_km1 + std::pow(z_km1, 2)) + std::pow(Pz_0, 2)*std::pow(y_k, 2) + std::pow(Pz_0, 2)*std::pow(y_km1, 2) + std::pow(Py_0, 2)*std::pow(z_k, 2) + std::pow(Py_0, 2)*std::pow(z_km1, 2) + std::pow(x_km1, 2)*(std::pow(Py_0, 2) - 2*Py_0*y_k + std::pow(Pz_0, 2) - 2*Pz_0*z_k + std::pow(y_k, 2) + std::pow(z_k, 2)) + std::pow(x_k, 2)*(std::pow(Py_0, 2) - 2*Py_0*y_km1 + std::pow(Pz_0, 2) - 2*Pz_0*z_km1 + std::pow(y_km1, 2) + std::pow(z_km1, 2)) - 2*std::pow(Pz_0, 2)*y_k*y_km1 - 2*Py_0*y_k*std::pow(z_km1, 2) - 2*Py_0*y_km1*std::pow(z_k, 2) - 2*Pz_0*std::pow(y_k, 2)*z_km1 - 2*Pz_0*std::pow(y_km1, 2)*z_k - 2*std::pow(Py_0, 2)*z_k*z_km1 + x_k*x_km1*(2*Py_0*y_k + 2*Py_0*y_km1 + 2*Pz_0*z_k + 2*Pz_0*z_km1 - 2*y_k*y_km1 - 2*z_k*z_km1 - 2*std::pow(Py_0, 2) - 2*std::pow(Pz_0, 2)) + Px_0*x_km1*(2*Py_0*y_k - 2*Py_0*y_km1 + 2*Pz_0*z_k - 2*Pz_0*z_km1 + 2*y_k*y_km1 + 2*z_k*z_km1 - 2*std::pow(y_k, 2) - 2*std::pow(z_k, 2)) - Px_0*x_k*(2*Py_0*y_k - 2*Py_0*y_km1 + 2*Pz_0*z_k - 2*Pz_0*z_km1 - 2*y_k*y_km1 - 2*z_k*z_km1 + 2*std::pow(y_km1, 2) + 2*std::pow(z_km1, 2)) + 2*Pz_0*y_k*y_km1*z_k + 2*Pz_0*y_k*y_km1*z_km1 + 2*Py_0*y_k*z_k*z_km1 + 2*Py_0*y_km1*z_k*z_km1 - 2*y_k*y_km1*z_k*z_km1 - 2*Py_0*Pz_0*y_k*z_k + 2*Py_0*Pz_0*y_k*z_km1 + 2*Py_0*Pz_0*y_km1*z_k - 2*Py_0*Pz_0*y_km1*z_km1) + (2*x_k*(std::pow(Py_0, 2) - 2*Py_0*y_kp1 + std::pow(Pz_0, 2) - 2*Pz_0*z_kp1 + std::pow(y_kp1, 2) + std::pow(z_kp1, 2)) + x_kp1*(2*Py_0*y_k + 2*Py_0*y_kp1 + 2*Pz_0*z_k + 2*Pz_0*z_kp1 - 2*y_k*y_kp1 - 2*z_k*z_kp1 - 2*std::pow(Py_0, 2) - 2*std::pow(Pz_0, 2)) - Px_0*(2*Py_0*y_k - 2*Py_0*y_kp1 + 2*Pz_0*z_k - 2*Pz_0*z_kp1 - 2*y_k*y_kp1 - 2*z_k*z_kp1 + 2*std::pow(y_kp1, 2) + 2*std::pow(z_kp1, 2)))/std::sqrt(std::pow(y_k, 2)*std::pow(z_kp1, 2) + std::pow(y_kp1, 2)*std::pow(z_k, 2) + std::pow(Px_0, 2)*(std::pow(y_k, 2) - 2*y_k*y_kp1 + std::pow(y_kp1, 2) + std::pow(z_k, 2) - 2*z_k*z_kp1 + std::pow(z_kp1, 2)) + std::pow(Pz_0, 2)*std::pow(y_k, 2) + std::pow(Pz_0, 2)*std::pow(y_kp1, 2) + std::pow(Py_0, 2)*std::pow(z_k, 2) + std::pow(Py_0, 2)*std::pow(z_kp1, 2) + std::pow(x_kp1, 2)*(std::pow(Py_0, 2) - 2*Py_0*y_k + std::pow(Pz_0, 2) - 2*Pz_0*z_k + std::pow(y_k, 2) + std::pow(z_k, 2)) + std::pow(x_k, 2)*(std::pow(Py_0, 2) - 2*Py_0*y_kp1 + std::pow(Pz_0, 2) - 2*Pz_0*z_kp1 + std::pow(y_kp1, 2) + std::pow(z_kp1, 2)) - 2*std::pow(Pz_0, 2)*y_k*y_kp1 - 2*Py_0*y_k*std::pow(z_kp1, 2) - 2*Py_0*y_kp1*std::pow(z_k, 2) - 2*Pz_0*std::pow(y_k, 2)*z_kp1 - 2*Pz_0*std::pow(y_kp1, 2)*z_k - 2*std::pow(Py_0, 2)*z_k*z_kp1 + x_k*x_kp1*(2*Py_0*y_k + 2*Py_0*y_kp1 + 2*Pz_0*z_k + 2*Pz_0*z_kp1 - 2*y_k*y_kp1 - 2*z_k*z_kp1 - 2*std::pow(Py_0, 2) - 2*std::pow(Pz_0, 2)) + Px_0*x_kp1*(2*Py_0*y_k - 2*Py_0*y_kp1 + 2*Pz_0*z_k - 2*Pz_0*z_kp1 + 2*y_k*y_kp1 + 2*z_k*z_kp1 - 2*std::pow(y_k, 2) - 2*std::pow(z_k, 2)) - Px_0*x_k*(2*Py_0*y_k - 2*Py_0*y_kp1 + 2*Pz_0*z_k - 2*Pz_0*z_kp1 - 2*y_k*y_kp1 - 2*z_k*z_kp1 + 2*std::pow(y_kp1, 2) + 2*std::pow(z_kp1, 2)) + 2*Pz_0*y_k*y_kp1*z_k + 2*Pz_0*y_k*y_kp1*z_kp1 + 2*Py_0*y_k*z_k*z_kp1 + 2*Py_0*y_kp1*z_k*z_kp1 - 2*y_k*y_kp1*z_k*z_kp1 - 2*Py_0*Pz_0*y_k*z_k + 2*Py_0*Pz_0*y_k*z_kp1 + 2*Py_0*Pz_0*y_kp1*z_k - 2*Py_0*Pz_0*y_kp1*z_kp1);
     double dAdy =  (2*y_k*(std::pow(Px_0, 2) - 2*Px_0*x_km1 + std::pow(Pz_0, 2) - 2*Pz_0*z_km1 + std::pow(x_km1, 2) + std::pow(z_km1, 2)) + y_km1*(2*Px_0*x_k + 2*Px_0*x_km1 + 2*Pz_0*z_k + 2*Pz_0*z_km1 - 2*x_k*x_km1 - 2*z_k*z_km1 - 2*std::pow(Px_0, 2) - 2*std::pow(Pz_0, 2)) - Py_0*(2*Px_0*x_k - 2*Px_0*x_km1 + 2*Pz_0*z_k - 2*Pz_0*z_km1 - 2*x_k*x_km1 - 2*z_k*z_km1 + 2*std::pow(x_km1, 2) + 2*std::pow(z_km1, 2)))/std::sqrt(std::pow(x_k, 2)*std::pow(z_km1, 2) + std::pow(x_km1, 2)*std::pow(z_k, 2) + std::pow(Py_0, 2)*(std::pow(x_k, 2) - 2*x_k*x_km1 + std::pow(x_km1, 2) + std::pow(z_k, 2) - 2*z_k*z_km1 + std::pow(z_km1, 2)) + std::pow(Pz_0, 2)*std::pow(x_k, 2) + std::pow(Pz_0, 2)*std::pow(x_km1, 2) + std::pow(Px_0, 2)*std::pow(z_k, 2) + std::pow(Px_0, 2)*std::pow(z_km1, 2) + std::pow(y_km1, 2)*(std::pow(Px_0, 2) - 2*Px_0*x_k + std::pow(Pz_0, 2) - 2*Pz_0*z_k + std::pow(x_k, 2) + std::pow(z_k, 2)) + std::pow(y_k, 2)*(std::pow(Px_0, 2) - 2*Px_0*x_km1 + std::pow(Pz_0, 2) - 2*Pz_0*z_km1 + std::pow(x_km1, 2) + std::pow(z_km1, 2)) - 2*std::pow(Pz_0, 2)*x_k*x_km1 - 2*Px_0*x_k*std::pow(z_km1, 2) - 2*Px_0*x_km1*std::pow(z_k, 2) - 2*Pz_0*std::pow(x_k, 2)*z_km1 - 2*Pz_0*std::pow(x_km1, 2)*z_k - 2*std::pow(Px_0, 2)*z_k*z_km1 + y_k*y_km1*(2*Px_0*x_k + 2*Px_0*x_km1 + 2*Pz_0*z_k + 2*Pz_0*z_km1 - 2*x_k*x_km1 - 2*z_k*z_km1 - 2*std::pow(Px_0, 2) - 2*std::pow(Pz_0, 2)) + Py_0*y_km1*(2*Px_0*x_k - 2*Px_0*x_km1 + 2*Pz_0*z_k - 2*Pz_0*z_km1 + 2*x_k*x_km1 + 2*z_k*z_km1 - 2*std::pow(x_k, 2) - 2*std::pow(z_k, 2)) - Py_0*y_k*(2*Px_0*x_k - 2*Px_0*x_km1 + 2*Pz_0*z_k - 2*Pz_0*z_km1 - 2*x_k*x_km1 - 2*z_k*z_km1 + 2*std::pow(x_km1, 2) + 2*std::pow(z_km1, 2)) + 2*Pz_0*x_k*x_km1*z_k + 2*Pz_0*x_k*x_km1*z_km1 + 2*Px_0*x_k*z_k*z_km1 + 2*Px_0*x_km1*z_k*z_km1 - 2*x_k*x_km1*z_k*z_km1 - 2*Px_0*Pz_0*x_k*z_k + 2*Px_0*Pz_0*x_k*z_km1 + 2*Px_0*Pz_0*x_km1*z_k - 2*Px_0*Pz_0*x_km1*z_km1) + (2*y_k*(std::pow(Px_0, 2) - 2*Px_0*x_kp1 + std::pow(Pz_0, 2) - 2*Pz_0*z_kp1 + std::pow(x_kp1, 2) + std::pow(z_kp1, 2)) + y_kp1*(2*Px_0*x_k + 2*Px_0*x_kp1 + 2*Pz_0*z_k + 2*Pz_0*z_kp1 - 2*x_k*x_kp1 - 2*z_k*z_kp1 - 2*std::pow(Px_0, 2) - 2*std::pow(Pz_0, 2)) - Py_0*(2*Px_0*x_k - 2*Px_0*x_kp1 + 2*Pz_0*z_k - 2*Pz_0*z_kp1 - 2*x_k*x_kp1 - 2*z_k*z_kp1 + 2*std::pow(x_kp1, 2) + 2*std::pow(z_kp1, 2)))/std::sqrt(std::pow(x_k, 2)*std::pow(z_kp1, 2) + std::pow(x_kp1, 2)*std::pow(z_k, 2) + std::pow(Py_0, 2)*(std::pow(x_k, 2) - 2*x_k*x_kp1 + std::pow(x_kp1, 2) + std::pow(z_k, 2) - 2*z_k*z_kp1 + std::pow(z_kp1, 2)) + std::pow(Pz_0, 2)*std::pow(x_k, 2) + std::pow(Pz_0, 2)*std::pow(x_kp1, 2) + std::pow(Px_0, 2)*std::pow(z_k, 2) + std::pow(Px_0, 2)*std::pow(z_kp1, 2) + std::pow(y_kp1, 2)*(std::pow(Px_0, 2) - 2*Px_0*x_k + std::pow(Pz_0, 2) - 2*Pz_0*z_k + std::pow(x_k, 2) + std::pow(z_k, 2)) + std::pow(y_k, 2)*(std::pow(Px_0, 2) - 2*Px_0*x_kp1 + std::pow(Pz_0, 2) - 2*Pz_0*z_kp1 + std::pow(x_kp1, 2) + std::pow(z_kp1, 2)) - 2*std::pow(Pz_0, 2)*x_k*x_kp1 - 2*Px_0*x_k*std::pow(z_kp1, 2) - 2*Px_0*x_kp1*std::pow(z_k, 2) - 2*Pz_0*std::pow(x_k, 2)*z_kp1 - 2*Pz_0*std::pow(x_kp1, 2)*z_k - 2*std::pow(Px_0, 2)*z_k*z_kp1 + y_k*y_kp1*(2*Px_0*x_k + 2*Px_0*x_kp1 + 2*Pz_0*z_k + 2*Pz_0*z_kp1 - 2*x_k*x_kp1 - 2*z_k*z_kp1 - 2*std::pow(Px_0, 2) - 2*std::pow(Pz_0, 2)) + Py_0*y_kp1*(2*Px_0*x_k - 2*Px_0*x_kp1 + 2*Pz_0*z_k - 2*Pz_0*z_kp1 + 2*x_k*x_kp1 + 2*z_k*z_kp1 - 2*std::pow(x_k, 2) - 2*std::pow(z_k, 2)) - Py_0*y_k*(2*Px_0*x_k - 2*Px_0*x_kp1 + 2*Pz_0*z_k - 2*Pz_0*z_kp1 - 2*x_k*x_kp1 - 2*z_k*z_kp1 + 2*std::pow(x_kp1, 2) + 2*std::pow(z_kp1, 2)) + 2*Pz_0*x_k*x_kp1*z_k + 2*Pz_0*x_k*x_kp1*z_kp1 + 2*Px_0*x_k*z_k*z_kp1 + 2*Px_0*x_kp1*z_k*z_kp1 - 2*x_k*x_kp1*z_k*z_kp1 - 2*Px_0*Pz_0*x_k*z_k + 2*Px_0*Pz_0*x_k*z_kp1 + 2*Px_0*Pz_0*x_kp1*z_k - 2*Px_0*Pz_0*x_kp1*z_kp1);
     double dAdz =  (2*z_k*(std::pow(Px_0, 2) - 2*Px_0*x_km1 + std::pow(Py_0, 2) - 2*Py_0*y_km1 + std::pow(x_km1, 2) + std::pow(y_km1, 2)) + z_km1*(2*Px_0*x_k + 2*Px_0*x_km1 + 2*Py_0*y_k + 2*Py_0*y_km1 - 2*x_k*x_km1 - 2*y_k*y_km1 - 2*std::pow(Px_0, 2) - 2*std::pow(Py_0, 2)) - Pz_0*(2*Px_0*x_k - 2*Px_0*x_km1 + 2*Py_0*y_k - 2*Py_0*y_km1 - 2*x_k*x_km1 - 2*y_k*y_km1 + 2*std::pow(x_km1, 2) + 2*std::pow(y_km1, 2)))/std::sqrt(std::pow(x_k, 2)*std::pow(y_km1, 2) + std::pow(x_km1, 2)*std::pow(y_k, 2) + std::pow(Pz_0, 2)*(std::pow(x_k, 2) - 2*x_k*x_km1 + std::pow(x_km1, 2) + std::pow(y_k, 2) - 2*y_k*y_km1 + std::pow(y_km1, 2)) + std::pow(Py_0, 2)*std::pow(x_k, 2) + std::pow(Py_0, 2)*std::pow(x_km1, 2) + std::pow(Px_0, 2)*std::pow(y_k, 2) + std::pow(Px_0, 2)*std::pow(y_km1, 2) + std::pow(z_km1, 2)*(std::pow(Px_0, 2) - 2*Px_0*x_k + std::pow(Py_0, 2) - 2*Py_0*y_k + std::pow(x_k, 2) + std::pow(y_k, 2)) + std::pow(z_k, 2)*(std::pow(Px_0, 2) - 2*Px_0*x_km1 + std::pow(Py_0, 2) - 2*Py_0*y_km1 + std::pow(x_km1, 2) + std::pow(y_km1, 2)) - 2*std::pow(Py_0, 2)*x_k*x_km1 - 2*Px_0*x_k*std::pow(y_km1, 2) - 2*Px_0*x_km1*std::pow(y_k, 2) - 2*Py_0*std::pow(x_k, 2)*y_km1 - 2*Py_0*std::pow(x_km1, 2)*y_k - 2*std::pow(Px_0, 2)*y_k*y_km1 + z_k*z_km1*(2*Px_0*x_k + 2*Px_0*x_km1 + 2*Py_0*y_k + 2*Py_0*y_km1 - 2*x_k*x_km1 - 2*y_k*y_km1 - 2*std::pow(Px_0, 2) - 2*std::pow(Py_0, 2)) + Pz_0*z_km1*(2*Px_0*x_k - 2*Px_0*x_km1 + 2*Py_0*y_k - 2*Py_0*y_km1 + 2*x_k*x_km1 + 2*y_k*y_km1 - 2*std::pow(x_k, 2) - 2*std::pow(y_k, 2)) - Pz_0*z_k*(2*Px_0*x_k - 2*Px_0*x_km1 + 2*Py_0*y_k - 2*Py_0*y_km1 - 2*x_k*x_km1 - 2*y_k*y_km1 + 2*std::pow(x_km1, 2) + 2*std::pow(y_km1, 2)) + 2*Py_0*x_k*x_km1*y_k + 2*Py_0*x_k*x_km1*y_km1 + 2*Px_0*x_k*y_k*y_km1 + 2*Px_0*x_km1*y_k*y_km1 - 2*x_k*x_km1*y_k*y_km1 - 2*Px_0*Py_0*x_k*y_k + 2*Px_0*Py_0*x_k*y_km1 + 2*Px_0*Py_0*x_km1*y_k - 2*Px_0*Py_0*x_km1*y_km1) + (2*z_k*(std::pow(Px_0, 2) - 2*Px_0*x_kp1 + std::pow(Py_0, 2) - 2*Py_0*y_kp1 + std::pow(x_kp1, 2) + std::pow(y_kp1, 2)) + z_kp1*(2*Px_0*x_k + 2*Px_0*x_kp1 + 2*Py_0*y_k + 2*Py_0*y_kp1 - 2*x_k*x_kp1 - 2*y_k*y_kp1 - 2*std::pow(Px_0, 2) - 2*std::pow(Py_0, 2)) - Pz_0*(2*Px_0*x_k - 2*Px_0*x_kp1 + 2*Py_0*y_k - 2*Py_0*y_kp1 - 2*x_k*x_kp1 - 2*y_k*y_kp1 + 2*std::pow(x_kp1, 2) + 2*std::pow(y_kp1, 2)))/std::sqrt(std::pow(x_k, 2)*std::pow(y_kp1, 2) + std::pow(x_kp1, 2)*std::pow(y_k, 2) + std::pow(Pz_0, 2)*(std::pow(x_k, 2) - 2*x_k*x_kp1 + std::pow(x_kp1, 2) + std::pow(y_k, 2) - 2*y_k*y_kp1 + std::pow(y_kp1, 2)) + std::pow(Py_0, 2)*std::pow(x_k, 2) + std::pow(Py_0, 2)*std::pow(x_kp1, 2) + std::pow(Px_0, 2)*std::pow(y_k, 2) + std::pow(Px_0, 2)*std::pow(y_kp1, 2) + std::pow(z_kp1, 2)*(std::pow(Px_0, 2) - 2*Px_0*x_k + std::pow(Py_0, 2) - 2*Py_0*y_k + std::pow(x_k, 2) + std::pow(y_k, 2)) + std::pow(z_k, 2)*(std::pow(Px_0, 2) - 2*Px_0*x_kp1 + std::pow(Py_0, 2) - 2*Py_0*y_kp1 + std::pow(x_kp1, 2) + std::pow(y_kp1, 2)) - 2*std::pow(Py_0, 2)*x_k*x_kp1 - 2*Px_0*x_k*std::pow(y_kp1, 2) - 2*Px_0*x_kp1*std::pow(y_k, 2) - 2*Py_0*std::pow(x_k, 2)*y_kp1 - 2*Py_0*std::pow(x_kp1, 2)*y_k - 2*std::pow(Px_0, 2)*y_k*y_kp1 + z_k*z_kp1*(2*Px_0*x_k + 2*Px_0*x_kp1 + 2*Py_0*y_k + 2*Py_0*y_kp1 - 2*x_k*x_kp1 - 2*y_k*y_kp1 - 2*std::pow(Px_0, 2) - 2*std::pow(Py_0, 2)) + Pz_0*z_kp1*(2*Px_0*x_k - 2*Px_0*x_kp1 + 2*Py_0*y_k - 2*Py_0*y_kp1 + 2*x_k*x_kp1 + 2*y_k*y_kp1 - 2*std::pow(x_k, 2) - 2*std::pow(y_k, 2)) - Pz_0*z_k*(2*Px_0*x_k - 2*Px_0*x_kp1 + 2*Py_0*y_k - 2*Py_0*y_kp1 - 2*x_k*x_kp1 - 2*y_k*y_kp1 + 2*std::pow(x_kp1, 2) + 2*std::pow(y_kp1, 2)) + 2*Py_0*x_k*x_kp1*y_k + 2*Py_0*x_k*x_kp1*y_kp1 + 2*Px_0*x_k*y_k*y_kp1 + 2*Px_0*x_kp1*y_k*y_kp1 - 2*x_k*x_kp1*y_k*y_kp1 - 2*Px_0*Py_0*x_k*y_k + 2*Px_0*Py_0*x_k*y_kp1 + 2*Px_0*Py_0*x_kp1*y_k - 2*Px_0*Py_0*x_kp1*y_kp1);
-    
+
     std::array<double, 3> dAdr = {dAdx, dAdy, dAdz};
     return dAdr; 
+}
+
+std::array<double, 3> Simulation::dAShoeLace(Vertex* prev, Vertex* next, int faceNorm){
+    double x_kp1 = next->getPos()[0];
+    double y_kp1 = next->getPos()[1];
+    double z_kp1 = next->getPos()[2];
+
+    double x_km1 = prev->getPos()[0];
+    double y_km1 = prev->getPos()[1];
+    double z_km1 = prev->getPos()[2];
+
+    double shoeLacedx;
+    double shoeLacedy;
+    double shoeLacedz;
+    if(faceNorm ==0){
+        //dealing with y and z plane
+        shoeLacedx = 0;
+        shoeLacedy = z_kp1-z_km1;
+        shoeLacedz = y_km1-y_kp1;
+    }
+    else if(faceNorm ==1){
+        //dealing with x and z plane
+        shoeLacedx = z_km1-z_kp1;
+        shoeLacedy = 0;
+        shoeLacedz = x_kp1-x_km1;
+    }
+    else if(faceNorm ==2){
+        //dealing with x and z plane
+        shoeLacedx = y_kp1-y_km1;
+        shoeLacedy = x_km1-x_kp1;
+        shoeLacedz = 0;
+    }
+    else{
+        std::cout<<"Error, invalid faceNorm \n";
+    }
+    std::array<double, 3> shoeLacedr = {shoeLacedx, shoeLacedy, shoeLacedz};
+    return shoeLacedr;
 }
 std::array<double, 3> Simulation::dVdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, std::array<double,3> cellCenter, int N_p, int N_c){
     double x_k = current->getPos()[0];
@@ -405,4 +467,21 @@ std::string Simulation::convertDouble(double val){
     }
     std::replace(str.begin(), str.end(), '.', 'p');
     return str;
+}
+
+std::string Simulation::getDate() {
+    // Get the current time
+    std::time_t t = std::time(nullptr);
+
+    // Convert it to a tm structure
+    std::tm* now = std::localtime(&t);
+
+    // Create a string stream to format the date
+    std::ostringstream date_stream;
+    date_stream << std::put_time(now, "%Y-%m-%d"); // Format: YYYY-MM-DD
+
+    // Get the formatted date as a string
+    std::string date_str = date_stream.str();
+
+    return date_str;
 }

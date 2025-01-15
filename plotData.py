@@ -1,11 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt 
 import os
+from datetime import datetime
+
 
 dir  = os.path.dirname(os.path.abspath(__file__))
 os.chdir(dir)
-base = "_V0_1_A0_6_timestep_0p005"
-run = "\\data\\Single_cell_gamma_sim"+base+"\\"
+date = datetime.now().strftime("%Y-%m-%d")
+print(date)
+base = "_V0_1p4_A0_6p44_timestep_0p001"
+run = "\\data\\"+date+"\\"+date+base+"\\"
 tests =  ["Area", "Centroid", "MaxForce", "Volume"]
 plot = ["Single_cell_"+x+base+".txt" for x in tests]
 filenames = [dir + run + file for file in plot] 
@@ -27,9 +31,7 @@ for index, file in enumerate(filenames):
         plt.ylabel(labels[i])
         plt.title(labels[i]+base)
         plt.legend()
-        if not os.path.exists("plots\\Single_cell_gamma_sim"+base+"\\"):
-            os.makedirs("plots\\Single_cell_gamma_sim"+base)
-        plt.savefig("plots\\Single_cell_gamma_sim"+base+"\\"+labels[i])
-
+        if not os.path.exists("plots\\"+ date+"\\"+date+base+"\\"):
+            os.makedirs("plots\\"+ date+"\\"+date+base)
+        plt.savefig("plots\\"+ date+"\\"+date+base+"\\"+labels[i])
 plt.show()
-

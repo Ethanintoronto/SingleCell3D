@@ -1,7 +1,9 @@
 #include "Cell.h"
 #include <cmath>
-Cell::Cell(std::vector<Vertex*> vertices, std::vector<Polygon*> polygons, int id): vertices_(vertices), polygons_(polygons), id_(id), area_(0.), centroid_({0.,0.,0.}), volume_(0.){
+#include <iostream>
+Cell::Cell(std::vector<Vertex*> vertices, std::vector<Polygon*> polygons, int id, double V0, double A0): vertices_(vertices), polygons_(polygons), id_(id), V0_(V0), A0_(A0), Kv_(10.), area_(0.), centroid_({0.,0.,0.}), volume_(0.){
     update();
+    checkPolygonOrientations();
 }
 
 const int Cell::getId() const{
@@ -15,6 +17,19 @@ const double Cell::getArea() const{
 const double Cell::getVolume() const{
     return volume_;
 }
+
+const double Cell::getKv() const{
+    return Kv_;
+}
+
+const double Cell::getV0() const{
+    return V0_;
+}
+
+const double Cell::getA0() const{
+    return A0_;
+}
+
 const std::vector<Vertex*>& Cell::getVertices() const{
     return vertices_;
 }
@@ -29,6 +44,18 @@ const std::array<double, 3>& Cell::getCentroid() const{
 
 void Cell::setId(int id){
     id_ = id;
+}
+
+void Cell::setKv(double Kv){
+    Kv_ = Kv;
+}
+
+void Cell::setV0(double V0){
+    V0_ = V0;
+}
+
+void Cell::setA0(double A0){
+    A0_ = A0;
 }
 
 void Cell::updateCentroid(){
@@ -91,5 +118,39 @@ void Cell::update(){
     updateArea();
     updateVolume();
 }
+
+void Cell::checkPolygonOrientations() {
+        for (const auto& polygon : polygons_) {
+            const auto& pv = polygon->getVertices();
+            double totalCrossZ = 0.0;
+            std::size_t n = pv.size();
+            for (std::size_t i = 0; i < n; ++i) {
+                const auto& v1 = pv[i]->getPos();
+                const auto& v2 = pv[(i + 1) % n]->getPos();
+
+                // Vectors from centroid to vertices
+                std::array<double, 3> vec1 = {v1[0] - polygon->getCentroid()[0], v1[1] - polygon->getCentroid()[1], v1[2] - polygon->getCentroid()[2]};
+                std::array<double, 3> vec2 = {v2[0] - polygon->getCentroid()[0], v2[1] - polygon->getCentroid()[1], v2[2] - polygon->getCentroid()[2]};
+
+                // Cross product z-component
+                double crossX = (vec1[1] * vec2[2]) - (vec1[2] * vec2[1]);
+                double crossY = (vec1[2] * vec2[0]) - (vec1[0] * vec2[2]);
+                double crossZ = (vec1[0] * vec2[1]) - (vec1[1] * vec2[0]);
+
+                // Vector from cell center to face center:
+                std::array<double, 3> centerFace = {polygon->getCentroid()[0]-centroid_[0], polygon->getCentroid()[1]-centroid_[1], polygon->getCentroid()[2]-centroid_[2]};
+                // Find the angle between the vector from the cell center to face center and the surface vector
+                // a dot b = abcostheta
+                // theta = acos(a dot b/|a|b|)
+                double cosTheta = (centerFace[0]*crossX + centerFace[1]*crossY + centerFace[2]*crossZ)/(std::sqrt(std::pow(centerFace[0],2)+std::pow(centerFace[1],2)+std::pow(centerFace[2],2))*std::sqrt(std::pow(crossX,2)+std::pow(crossY,2)+std::pow(crossZ,2)));
+                //clamp values to [-1, 1]
+                cosTheta = std::max(-1.0, std::min(1.0, cosTheta));
+                double theta = std::acos(cosTheta);
+                if (theta>=1.57079632679){
+                    throw std::invalid_argument("Polygon orientation error");
+                }
+            }
+        }
+    }
 
 
