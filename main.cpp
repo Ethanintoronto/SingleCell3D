@@ -109,7 +109,13 @@ void readVTKAndCreateObjects(const std::string& filePath,
                 std::cout<<"Failed to find edge";
             }
         }
-
+        Polygon* polygon = new Polygon(faceVertices, faceEdges, polygonId++);
+        if (polygon->getId() == 2){
+            polygon->setGamma(1.);
+        }
+        else if (polygon->getId() == 5){
+            polygon->setGamma(1.);
+        }
         polygons.push_back(new Polygon(faceVertices, faceEdges, polygonId++));        
     }
 }
@@ -124,12 +130,12 @@ int main() {
     // Step 4: Create the cell
     std::string shape = "cube";
     double eta = 1.0;
-    double timestep = 0.001; //HY uses 0.005
-    int numTimesteps = 5; //HY using 1000
-    double V0 = 2.744; //HY using cube of length 1.4
+    double timestep = 0.001; 
+    int numTimesteps = 1000; 
+    double V0 = 2.744; 
     double A0 = 11.76;
-    int log = 1; //HY using 10
-    bool write = false;
+    int log = 1; 
+    bool write = true;
 
     std::string vtkFilePath = std::string("vtk_in//")+shape+std::string(".vtk"); 
     readVTKAndCreateObjects(vtkFilePath, vertices, edges, polygons);
