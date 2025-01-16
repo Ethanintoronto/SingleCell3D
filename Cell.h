@@ -8,6 +8,7 @@ private:
     double volume_;
     double area_;
     double Kv_;
+    double Ka_;
     double V0_;
     double A0_;
     std::array<double, 3> centroid_;
@@ -22,8 +23,10 @@ public:
     const double getVolume() const;
     const double getArea() const; 
     const double getKv() const;
+    const double getKa() const;
     const double getV0() const;
     const double getA0() const;
+    const double getEnergy() const; 
     const std::array<double, 3>& getCentroid() const;
     const int getId() const;
     const std::vector<Polygon*>& getPolygons() const;
@@ -31,6 +34,7 @@ public:
     void update();
     void setId(int id);
     void setKv(double Kv);
+    void setKa(double Ka);
     void setV0(double V0);
     void setA0(double A0);
 };
