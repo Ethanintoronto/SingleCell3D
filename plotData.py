@@ -8,9 +8,9 @@ dir  = os.path.dirname(os.path.abspath(__file__))
 os.chdir(dir)
 date = datetime.now().strftime("%Y-%m-%d")
 print(date)
-base = "_V0_1p4_A0_6p44_timestep_0p001"
+base = "_V0_1_A0_6_timestep_0p001"
 run = "\\data\\"+date+"\\"+date+base+"\\"
-tests =  ["Area", "Centroid", "MaxForce", "Volume"]
+tests =  ["Area", "Centroid", "MaxForce", "Volume", "Energy"]
 plot = ["Single_cell_"+x+base+".txt" for x in tests]
 filenames = [dir + run + file for file in plot] 
 

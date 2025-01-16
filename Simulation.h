@@ -22,6 +22,7 @@ private:
     void writeMaxForce();
     void writeVolume();
     void writeArea();
+    void writeEnergy(); 
     void writeCellCentroid();
     void update();
     std::string convertDouble(double val);

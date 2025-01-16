@@ -23,6 +23,7 @@ void Simulation::Run(){
             writeVolume();
             writeArea();
             writeCellCentroid();
+            writeEnergy();
         }
         time_ += 1;
         if (write_ && time_%log_==0){
@@ -102,17 +103,14 @@ void Simulation::updateForces(){
                     dVdr_k[l] = (dV_inner[l] + dVdr_k[l])/6;
                 }
                 double phase = 0;
-                if (polygon->getGamma()>0){
-                    phase = std::pow(std::sin(pi*time_/25),2);
+                if (polygon->getGamma()>0.){
+                    phase = std::pow(std::sin(pi*time_/50),2); //period of 100 timesteps
                 } 
-                else if (polygon->getGamma()<0){
-                    phase = std::pow(std::cos(pi*time_/25), 2);
-                }
-                for (int l = 0; l<3; l++){
-                    force[l] -= polygon->getGamma()*phase*dAdr_k[l]; 
+                else if (polygon->getGamma()<0.){
+                    phase = std::pow(std::cos(pi*time_/50), 2); //period of 100 timesteps
                 }
                 for (int l =0; l<3; l++){
-                    force[l] -= 2*polygon->getKa()*(cell->getArea()-cell->getA0())*dAdr_k[l] + 2*cell->getKv()*(cell->getVolume()-cell->getV0())*dVdr_k[l];
+                    force[l] -=  2*polygon->getKa()*(cell->getArea()-cell->getA0())*dAdr_k[l] + 2*cell->getKv()*(cell->getVolume()-cell->getV0())*dVdr_k[l] + std::abs(polygon->getGamma())*phase*dAdr_k[l];
                 }
                 curr->setForce(force);
             }
@@ -296,6 +294,36 @@ void Simulation::writeVolume(){
         return;
     }
     volumeFile<<time_*timestep_<<","<< cells_[0]->getVolume()<<"\n";
+    // Close the file
+    volumeFile.close();
+}
+
+void Simulation::writeEnergy(){
+    //Open file:
+    std::ostringstream dataDir;
+    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_);
+    if (!std::filesystem::exists(dataDir.str())){
+        if(std::filesystem::create_directories(dataDir.str())){
+            std::cout <<"Datadir created successfully\n";
+        }
+        else{
+            std::cout <<"Failed to create directory\n";
+        }
+    }
+    std::ostringstream filename;
+    filename << dataDir.str()<<"/Single_cell_Energy_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_)<< ".txt";
+    std::ofstream volumeFile;
+    if (time_ ==0){
+        volumeFile.open(filename.str(), std::ios::trunc);
+    }
+    else {
+        volumeFile.open(filename.str(), std::ios::app);
+    }
+    if (!volumeFile.is_open()) {
+        std::cerr << "Error opening the force file for writing!" << std::endl;
+        return;
+    }
+    volumeFile<<time_*timestep_<<","<< cells_[0]->getEnergy()<<"\n";
     // Close the file
     volumeFile.close();
 }
