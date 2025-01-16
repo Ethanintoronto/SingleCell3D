@@ -110,13 +110,8 @@ void readVTKAndCreateObjects(const std::string& filePath,
             }
         }
         Polygon* polygon = new Polygon(faceVertices, faceEdges, polygonId++);
-        if (polygon->getId() == 2){
-            polygon->setGamma(1.);
-        }
-        else if (polygon->getId() == 5){
-            polygon->setGamma(1.);
-        }
-        polygons.push_back(new Polygon(faceVertices, faceEdges, polygonId++));        
+        polygons.push_back(polygon);
+        //polygons.push_back(new Polygon(faceVertices, faceEdges, polygonId++));        
     }
 }
 
@@ -127,20 +122,33 @@ int main() {
     std::vector<Polygon*> polygons;
 
 
-    // Step 4: Create the cell
+    // Initialize Simulation Parameters:
     std::string shape = "cube";
     double eta = 1.0;
     double timestep = 0.001; 
-    int numTimesteps = 1000; 
-    double V0 = 2.744; 
-    double A0 = 11.76;
-    int log = 1; 
+    int numTimesteps = 10000; 
+    double V0 = 1; 
+    double A0 = 6;
+    int log = 20; 
     bool write = true;
 
     std::string vtkFilePath = std::string("vtk_in//")+shape+std::string(".vtk"); 
     readVTKAndCreateObjects(vtkFilePath, vertices, edges, polygons);
+    
+    //Set gamma parameters
+    for (Polygon* polygon :polygons){
+        //polygon->setKa(0.);
+        if (polygon->getId() == 2){
+            polygon->setGamma(1.);
+        }
+        else if (polygon->getId() == 5){
+            polygon->setGamma(-1.);
+        }
+    }
     std::vector<Cell*> cells;
-    cells.push_back(new Cell(vertices, polygons, 0, V0, A0));
+    Cell* cell = new Cell(vertices, polygons, 0, V0, A0);
+    cell->setKv(10.);
+    cells.push_back(cell);
     std::cout << "Starting Simulation\n"; 
     Simulation sim(cells, polygons, edges, vertices, timestep, numTimesteps, eta, log, write); 
 
