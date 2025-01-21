@@ -22,6 +22,10 @@ const double Cell::getKv() const{
     return Kv_;
 }
 
+const double Cell::getKa() const{
+    return Ka_;
+}
+
 const double Cell::getV0() const{
     return V0_;
 }
@@ -52,6 +56,10 @@ void Cell::setId(int id){
 
 void Cell::setKv(double Kv){
     Kv_ = Kv;
+}
+
+void Cell::setKa(double Ka){
+    Ka_ = Ka;
 }
 
 void Cell::setV0(double V0){
