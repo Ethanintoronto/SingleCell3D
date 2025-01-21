@@ -8,7 +8,11 @@ dir  = os.path.dirname(os.path.abspath(__file__))
 os.chdir(dir)
 date = datetime.now().strftime("%Y-%m-%d")
 print(date)
-base = "_V0_1_A0_6_timestep_0p001"
+V0 = "1"
+A0 = "6"
+gamma = "2p3"
+timestep = "0p001"
+base = "_gamma_"+gamma+"_V0_"+V0+"_A0_"+A0+"_timestep_"+timestep
 run = "\\data\\"+date+"\\"+date+base+"\\"
 tests =  ["Area", "Centroid", "MaxForce", "Volume", "Energy"]
 plot = ["Single_cell_"+x+base+".txt" for x in tests]

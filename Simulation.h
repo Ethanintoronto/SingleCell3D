@@ -9,6 +9,7 @@ private:
     double eta_;
     int log_;
     bool write_;
+    double period_;
     std::vector<Cell*> cells_; 
     std::vector<Vertex*> vertices_;
     std::vector<Edge*> edges_;

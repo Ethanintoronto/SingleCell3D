@@ -115,12 +115,10 @@ void readVTKAndCreateObjects(const std::string& filePath,
     }
 }
 
-
 int main() {
     std::vector<Vertex*> vertices;
     std::vector<Edge*> edges;
     std::vector<Polygon*> polygons;
-
 
     // Initialize Simulation Parameters:
     std::string shape = "cube";
@@ -129,7 +127,7 @@ int main() {
     int numTimesteps = 10000; 
     double V0 = 1; 
     double A0 = 6;
-    int log = 20; 
+    int log = 10; 
     bool write = true;
 
     std::string vtkFilePath = std::string("vtk_in//")+shape+std::string(".vtk"); 
@@ -137,17 +135,18 @@ int main() {
     
     //Set gamma parameters
     for (Polygon* polygon :polygons){
-        //polygon->setKa(0.);
+        polygon->setKa(10.);
         if (polygon->getId() == 2){
-            polygon->setGamma(1.);
+            polygon->setGamma(2.3);
         }
         else if (polygon->getId() == 5){
-            polygon->setGamma(-1.);
+            polygon->setGamma(-2.3);
         }
     }
     std::vector<Cell*> cells;
     Cell* cell = new Cell(vertices, polygons, 0, V0, A0);
     cell->setKv(10.);
+    cell->setKa(0.); 
     cells.push_back(cell);
     std::cout << "Starting Simulation\n"; 
     Simulation sim(cells, polygons, edges, vertices, timestep, numTimesteps, eta, log, write); 
