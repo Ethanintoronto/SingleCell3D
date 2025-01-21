@@ -127,6 +127,11 @@ int main() {
     int numTimesteps = 10000; 
     double V0 = 1; 
     double A0 = 6;
+    double gamma = 5;
+    double Kv = 10.;
+    double KaCell = 0;
+    double KaPoly = 10.;
+
     int log = 10; 
     bool write = true;
 
@@ -135,18 +140,18 @@ int main() {
     
     //Set gamma parameters
     for (Polygon* polygon :polygons){
-        polygon->setKa(10.);
+        polygon->setKa(KaPoly);
         if (polygon->getId() == 2){
-            polygon->setGamma(2.3);
+            polygon->setGamma(gamma);
         }
         else if (polygon->getId() == 5){
-            polygon->setGamma(-2.3);
+            polygon->setGamma(-1*gamma);
         }
     }
     std::vector<Cell*> cells;
     Cell* cell = new Cell(vertices, polygons, 0, V0, A0);
-    cell->setKv(10.);
-    cell->setKa(0.); 
+    cell->setKv(Kv);
+    cell->setKa(KaCell); 
     cells.push_back(cell);
     std::cout << "Starting Simulation\n"; 
     Simulation sim(cells, polygons, edges, vertices, timestep, numTimesteps, eta, log, write); 
