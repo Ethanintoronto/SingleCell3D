@@ -26,8 +26,6 @@ def write_polyhedron_to_vtk(solid_name, file_path):
     vertices = solid.points
     FV = solid.faces[0]
     faces = solid.faces.reshape(-1, FV+1)[:, 1:]  # Remove face sizes for VTK compatibility
-    print(solid.volume)
-    print(solid.area)
 
     # Write to a VTK file
     with open(file_path, 'w') as vtk_file:
@@ -50,7 +48,7 @@ def write_polyhedron_to_vtk(solid_name, file_path):
 
 # Usage
 # Create an output directory if it doesn't exist
-output_dir = "vtk_in"
+output_dir = ".\\vtk_in"
 os.makedirs(output_dir, exist_ok=True)
 
 # List of Platonic solids

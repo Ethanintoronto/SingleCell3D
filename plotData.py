@@ -4,10 +4,8 @@ import os
 from datetime import datetime
 
 
-dir  = os.path.dirname(os.path.abspath(__file__))
-os.chdir(dir)
+dir  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 date = datetime.now().strftime("%Y-%m-%d")
-print(date)
 V0 = "1"
 A0 = "6"
 gamma = "2p3"
