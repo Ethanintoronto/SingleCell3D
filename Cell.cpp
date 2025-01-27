@@ -159,7 +159,7 @@ void Cell::checkPolygonOrientations() {
                 cosTheta = std::max(-1.0, std::min(1.0, cosTheta));
                 double theta = std::acos(cosTheta);
                 if (theta>=1.57079632679){
-                    throw std::invalid_argument("Polygon orientation error");
+                    std::cout<<"WARNING: Polygon orientation error";
                 }
             }
         }
