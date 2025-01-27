@@ -13,7 +13,7 @@
 void readVTKAndCreateObjects(const std::string& filePath, 
                              std::vector<Vertex*>& vertices, 
                              std::vector<Edge*>& edges, 
-                             std::vector<Polygon*>& polygons) {
+                             std::vector<Polygon*>& polygons) { // Group polygons by cube_id
     std::ifstream file(filePath);
     if (!file.is_open()) {
         throw std::runtime_error("Could not open file " + filePath);
@@ -25,12 +25,14 @@ void readVTKAndCreateObjects(const std::string& filePath,
     std::vector<std::array<double, 3>> points;
     std::vector<std::vector<int>> polygonFaces;
     std::string keyword;
-    int numpoints = -1;
+    int numpoints = -1, numPolygons = -1;
+
     while (std::getline(file, line)) {
         std::istringstream iss(line);
-        if (!readingPoints && !readingPolygons){
+        if (!readingPoints && !readingPolygons) {
             iss >> keyword;
         }
+
         if (keyword == "POINTS") {
             iss >> numpoints;
             readingPoints = true;
@@ -38,6 +40,7 @@ void readVTKAndCreateObjects(const std::string& filePath,
             keyword = "reading points...";
             continue;
         } else if (keyword == "POLYGONS") {
+            iss >> numPolygons; // Read the number of polygons
             readingPoints = false;
             readingPolygons = true;
             keyword = "reading polygons...";
@@ -46,10 +49,10 @@ void readVTKAndCreateObjects(const std::string& filePath,
 
         if (readingPoints) {
             std::array<double, 3> point;
-            iss >> point[0]>> point[1] >> point[2];
+            iss >> point[0] >> point[1] >> point[2];
             points.push_back(point);
             numpoints--;
-            if(numpoints==0){
+            if (numpoints == 0) {
                 readingPoints = false;
             }
         } else if (readingPolygons) {
@@ -62,6 +65,37 @@ void readVTKAndCreateObjects(const std::string& filePath,
                 face.push_back(vertexId);
             }
             polygonFaces.push_back(face);
+            numPolygons--;
+            if (numPolygons == 0){
+                readingPolygons = false;
+            }
+        }
+    }
+    file.close();
+
+    //Open helper to read cells
+    std::ifstream file(filePath.substr(0,filePath.length()-4)+"_helper.txt");
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open file " + filePath);
+    }
+    std::string line;
+    bool readingCells = false;
+    int polyId;
+    std::vector<std::vector<int>> cellStructure;
+    while (std::getline(file, line)) {
+        std::istringstream iss(line);
+        if (!readingCells) {
+            readingCells = true;
+            continue;
+        }
+        if (readingCells){
+            iss >> numPolygons;
+            std::vector<int> cell;
+            for (int i = 0; i<numPolygons; i++){
+                iss >> polyId;
+                cell.push_back(polyId);
+            }
+            cellStructure.push_back(cell);
         }
     }
     file.close();
@@ -70,7 +104,6 @@ void readVTKAndCreateObjects(const std::string& filePath,
     for (size_t i = 0; i < points.size(); ++i) {
         vertices.push_back(new Vertex(points[i], i));
     }
-
     // Create Edge objects
     std::map<std::tuple<int, int>, Edge*> edgeMap;
     int edgeId = 0;
@@ -81,40 +114,52 @@ void readVTKAndCreateObjects(const std::string& filePath,
             int v2 = face[(i + 1) % face.size()];
 
             std::tuple edgeKey = std::make_tuple(v1, v2);
-            std::tuple other = std::make_tuple(v2,v1);
-            if (edgeMap.find(edgeKey) == edgeMap.end() && edgeMap.find(other)==edgeMap.end()) {
+            std::tuple other = std::make_tuple(v2, v1);
+            if (edgeMap.find(edgeKey) == edgeMap.end() && edgeMap.find(other) == edgeMap.end()) {
                 edgeMap[edgeKey] = new Edge({vertices[v1], vertices[v2]}, edgeId++);
                 edges.push_back(edgeMap[edgeKey]);
             }
         }
     }
 
-    // Create Polygon objects
+    // Create Polygon objects and group them by cube_id
     int polygonId = 0;
-    for (const auto& face : polygonFaces) {
+    for (size_t i = 0; i < polygonFaces.size(); ++i) {
+        const auto& face = polygonFaces[i];
         std::vector<Vertex*> faceVertices;
         std::vector<Edge*> faceEdges;
-        for (size_t i = 0; i < face.size(); ++i) {
-            faceVertices.push_back(vertices[face[i]]);
 
-            int v1 = face[i];
-            int v2 = face[(i + 1) % face.size()];
+        for (size_t j = 0; j < face.size(); ++j) {
+            faceVertices.push_back(vertices[face[j]]);
 
+            int v1 = face[j];
+            int v2 = face[(j + 1) % face.size()];
+            
             std::tuple edgeKey = std::make_tuple(v1, v2);
             std::tuple other = std::make_tuple(v2, v1);
-            if (edgeMap.find(edgeKey)!=edgeMap.end()){
+            if (edgeMap.find(edgeKey) != edgeMap.end()) {
                 faceEdges.push_back(edgeMap[edgeKey]);
-            }
-            else if (edgeMap.find(other)!=edgeMap.end()){
+            } else if (edgeMap.find(other) != edgeMap.end()) {
                 faceEdges.push_back(edgeMap[other]);
-            }
-            else {
-                std::cout<<"Failed to find edge";
+            } else {
+                std::cerr << "Failed to find edge\n";
             }
         }
+        // Create a polygon
         Polygon* polygon = new Polygon(faceVertices, faceEdges, polygonId++);
         polygons.push_back(polygon);      
     }
+
+    // Create cells
+    for (int i = 0; i<cellStructure.size();i++){
+        const auto& thisCellStructure = cellStructure[i];
+        std::vector<Polygon*> cellPolygons;
+        for (int j = 0; j<thisCellStructure.size(); j++){
+            cellPolygons.push_back(polygons[thisCellStructure[j]]);
+        }
+        Cell* cell = new Cell(cellVertices, cellPolygons, cellId++, V0, A0);
+    }
+    
 }
 int get_next_index(const std::string& directory) {
     std::regex pattern(R"(_(\d{3})$)"); // Matches "_000", "_001", etc. at the end of filenames
@@ -154,6 +199,7 @@ std::string getDate() {
 
     return date_str;
 }
+
 
 int main() {
     bool batchMode = true;
