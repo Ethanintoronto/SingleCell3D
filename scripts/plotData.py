@@ -8,11 +8,12 @@ dir  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 date = datetime.now().strftime("%Y-%m-%d")
 V0 = "1"
 A0 = "6"
-gamma = "2p3"
+gamma = "2"
 timestep = "0p001"
-base = "_gamma_"+gamma+"_V0_"+V0+"_A0_"+A0+"_timestep_"+timestep
+id = "007"
+base = "_gamma_"+gamma+"_V0_"+V0+"_A0_"+A0+"_timestep_"+timestep+"_"+id
 run = "\\data\\"+date+"\\"+date+base+"\\"
-tests =  ["Area", "Centroid", "MaxForce", "Volume", "Energy"]
+tests =  ["Area", "Centroid", "Volume", "MaxForce"]
 plot = ["Single_cell_"+x+base+".txt" for x in tests]
 filenames = [dir + run + file for file in plot] 
 
@@ -36,4 +37,4 @@ for index, file in enumerate(filenames):
         if not os.path.exists("plots\\"+ date+"\\"+date+base+"\\"):
             os.makedirs("plots\\"+ date+"\\"+date+base)
         plt.savefig("plots\\"+ date+"\\"+date+base+"\\"+labels[i])
-plt.show()
+#plt.show()

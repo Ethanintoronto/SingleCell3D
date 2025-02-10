@@ -124,15 +124,17 @@ int main() {
     std::string shape = "cube";
     double eta = 1.0;
     double timestep = 0.001; 
-    int numTimesteps = 10000; 
     double V0 = 1; 
     double A0 = 6;
-    double gamma = 5;
+    double gamma = 2;
     double Kv = 10.;
-    double KaCell = 0;
-    double KaPoly = 10.;
+    double KaCell = 1;
+    double KaPoly = 5;
+    double period = 500;
+    int numTimesteps = period*10; 
+    int id = 7;
 
-    int log = 10; 
+    int log = period/10; 
     bool write = true;
 
     std::string vtkFilePath = std::string("vtk_in//")+shape+std::string(".vtk"); 
@@ -154,7 +156,7 @@ int main() {
     cell->setKa(KaCell); 
     cells.push_back(cell);
     std::cout << "Starting Simulation\n"; 
-    Simulation sim(cells, polygons, edges, vertices, timestep, numTimesteps, eta, log, write); 
+    Simulation sim(cells, polygons, edges, vertices, id, period, timestep, numTimesteps, eta, log, write); 
 
     // Cleanup dynamically allocated objects
     for (auto vertex : vertices) delete vertex;

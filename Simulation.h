@@ -4,6 +4,7 @@
 class Simulation{
 private:
     int time_;
+    int id_;
     double timestep_;
     int numTimesteps_;
     double eta_;
@@ -25,13 +26,18 @@ private:
     void writeArea();
     void writeEnergy(); 
     void writeCellCentroid();
+    void writeCellGeoCentroid();
     void update();
+    void setId(int id);
+    void setPeriod(double period);
     std::string convertDouble(double val);
     std::string getDate();
+    const int getId() const;
+    const double getPeriod() const;
     std::array<double, 3> dAdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, int N_p);
     std::array<double, 3> dVdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, std::array<double,3> cellCenter, int N_p, int N_c);
     std::array<double, 3> dAShoeLace(Vertex* prev, Vertex* next, int faceNorm);
 
 public:
-    explicit Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, double timestep, int numTimesteps, double eta, int log, bool write);
+    explicit Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, int id, double period, double timestep, int numTimesteps, double eta, int log, bool write);
 };
