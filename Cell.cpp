@@ -1,7 +1,7 @@
 #include "Cell.h"
 #include <cmath>
 #include <iostream>
-Cell::Cell(std::vector<Vertex*> vertices, std::vector<Polygon*> polygons, int id, double V0, double A0): vertices_(vertices), polygons_(polygons), id_(id), V0_(V0), A0_(A0), Kv_(10.),Ka_(1.), area_(0.), centroid_({0.,0.,0.}), volume_(0.){
+Cell::Cell(std::vector<Vertex*> vertices, std::vector<Polygon*> polygons, int id, double V0, double A0): vertices_(vertices), polygons_(polygons), id_(id), V0_(V0), A0_(A0), Kv_(10.),Ka_(1.), area_(0.), centroid_({0.,0.,0.}),geoCentroid_({0.,0.,0.}), volume_(0.){
     update();
     checkPolygonOrientations();
 }
@@ -46,6 +46,10 @@ const std::array<double, 3>& Cell::getCentroid() const{
     return centroid_;
 }
 
+const std::array<double, 3>& Cell::getGeoCentroid() const{
+    return geoCentroid_;
+}
+
 const double Cell::getEnergy() const{
     return Ka_*std::pow((area_-A0_),2) + Kv_*std::pow((volume_-V0_),2);
 }
@@ -84,6 +88,53 @@ void Cell::updateCentroid(){
     centroid_[0]=dx[0]/nV;
     centroid_[1]=dx[1]/nV;
     centroid_[2]=dx[2]/nV;
+    updateVolume(); //Merge with geocentroid loop below in the future to improve efficiency. 
+    //The follwoing method calculates the weighted geometric centroid from tetrahedron decomposition weighted by signed volume
+
+    for (int i =0; i<3; i++){
+        geoCentroid_[i] = 0.;
+    }
+    std::array<double, 3> ci; //face center to curr
+    std::array<double, 3> cj; //face center to next
+    std::array<double, 3> cc; //cell center to face center
+    std::array<double, 3> ctetra; // center of the tetrahedron 
+    for (int i=0; i<polygons_.size(); i++){
+        Polygon* polygon  = polygons_[i];
+        for (int j = 0; j<polygon->getVertices().size();j++){
+            Vertex* curr = polygon->getVertices()[j];
+            Vertex* next = polygon->getVertices()[(j+1)%polygon->getVertices().size()];
+            //Form two vectors from the polygon center to the edge vertices. 
+            
+            ci[0] = curr->getPos()[0]-polygon->getCentroid()[0];
+            cj[0] = next->getPos()[0]-polygon->getCentroid()[0];
+
+            ci[1] = curr->getPos()[1]-polygon->getCentroid()[1];
+            cj[1] = next->getPos()[1]-polygon->getCentroid()[1];
+
+            ci[2] = curr->getPos()[2]-polygon->getCentroid()[2];
+            cj[2] = next->getPos()[2]-polygon->getCentroid()[2];
+
+            //Form vector from cell centroid to face centroid
+            cc[0] = polygon->getCentroid()[0] - centroid_[0];
+            cc[1] = polygon->getCentroid()[1] - centroid_[1];
+            cc[2] = polygon->getCentroid()[2] - centroid_[2]; 
+
+            //Get the center of the tetrahedron
+            ctetra[0] = (curr->getPos()[0]+next->getPos()[0]+polygon->getCentroid()[0]+centroid_[0])/4;
+            ctetra[1] = (curr->getPos()[1]+next->getPos()[1]+polygon->getCentroid()[1]+centroid_[1])/4;
+            ctetra[2] = (curr->getPos()[2]+next->getPos()[2]+polygon->getCentroid()[2]+centroid_[2])/4;
+            
+
+            //Take the cross product of curr cross next to get vector pointing out the cell 
+            //and dot with vector from cell center to face center to get positive signed volume 
+            geoCentroid_[0] += ctetra[0]*(cc[0]*(ci[1]*cj[2]-ci[2]*cj[1])/6);
+            geoCentroid_[1] += ctetra[1]*(cc[1]*(ci[2]*cj[0]-ci[0]*cj[2])/6);
+            geoCentroid_[2] += ctetra[2]*(cc[2]*(ci[0]*cj[1]-ci[1]*cj[0])/6);
+        }
+    }
+    for (int i =0; i<3;i++){
+        geoCentroid_[i]/= volume_;
+    }     
 }
 
 void Cell::updateVolume(){
@@ -128,7 +179,6 @@ void Cell::update(){
     }
     updateCentroid();
     updateArea();
-    updateVolume();
 }
 
 void Cell::checkPolygonOrientations() {
