@@ -12,6 +12,7 @@
 
 # data
 *.vtk
+*.txt
 data/
 plots/
 movies/
