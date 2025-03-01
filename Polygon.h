@@ -30,13 +30,13 @@ private:
 public:
     explicit Polygon(std::vector<Vertex*> vertices, std::vector<Edge*> edges, int id);
 
-    const int getId() const;
+    int getId() const;
 
-    const double getArea() const;
+    double getArea() const;
 
-    const double getPerimeter() const;
+    double getPerimeter() const;
 
-    const double getKa() const;
+    double getKa() const;
 
     const std::vector<Edge*>& getEdges() const;
 
@@ -46,7 +46,7 @@ public:
 
     const std::array<double, 3>& getCentroid() const;
 
-    const double getGamma() const;
+    double getGamma() const;
 
     void setGamma(double gamma);
 
