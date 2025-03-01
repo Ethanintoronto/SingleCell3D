@@ -1,36 +1,37 @@
 #include "Cell.h"
 #include <cmath>
 #include <iostream>
+#include <cmath>
 Cell::Cell(std::vector<Vertex*> vertices, std::vector<Polygon*> polygons, int id, double V0, double A0): vertices_(vertices), polygons_(polygons), id_(id), V0_(V0), A0_(A0), Kv_(10.),Ka_(1.), area_(0.), centroid_({0.,0.,0.}),geoCentroid_({0.,0.,0.}), volume_(0.){
     update();
     checkPolygonOrientations();
 }
 
-const int Cell::getId() const{
+int Cell::getId() const{
     return id_;
 }
 
-const double Cell::getArea() const{
+double Cell::getArea() const{
     return area_;
 }
 
-const double Cell::getVolume() const{
+double Cell::getVolume() const{
     return volume_;
 }
 
-const double Cell::getKv() const{
+double Cell::getKv() const{
     return Kv_;
 }
 
-const double Cell::getKa() const{
+double Cell::getKa() const{
     return Ka_;
 }
 
-const double Cell::getV0() const{
+double Cell::getV0() const{
     return V0_;
 }
 
-const double Cell::getA0() const{
+double Cell::getA0() const{
     return A0_;
 }
 
@@ -50,7 +51,7 @@ const std::array<double, 3>& Cell::getGeoCentroid() const{
     return geoCentroid_;
 }
 
-const double Cell::getEnergy() const{
+double Cell::getEnergy() const{
     return Ka_*std::pow((area_-A0_),2) + Kv_*std::pow((volume_-V0_),2);
 }
 
@@ -74,145 +75,113 @@ void Cell::setA0(double A0){
     A0_ = A0;
 }
 
-void Cell::updateCentroid(){
-    //the following method is the simplest way of calculating a centroid from the average vertex positions:
+void Cell::updateGeometry(){
+    //Updates the centroid, area and volume of the cell 
+    
+    //the following method is the simplest way of calculating a centroid from the average of the vertex positions:
     double nV = 0; 
-    double dx[3];
+    std::array<double, 3> positionSum = {0.,0.,0.};
     for (const auto& vert : vertices_){
         nV++;
-        std::array<double, 3> pos = vert->getPos();
-        dx[0] += pos[0];
-        dx[1] += pos[1];
-        dx[2] += pos[2];
+        const auto& pos = vert->getPos();
+        for (int i =0; i<3; i++){
+            positionSum[i]+= pos[i];
+        }
     }
-    centroid_[0]=dx[0]/nV;
-    centroid_[1]=dx[1]/nV;
-    centroid_[2]=dx[2]/nV;
-    updateVolume(); //Merge with geocentroid loop below in the future to improve efficiency. 
-    //The follwoing method calculates the weighted geometric centroid from tetrahedron decomposition weighted by signed volume
+    for (int i = 0; i<3; i++){
+        centroid_[i] = positionSum[i]/nV;
+    }
+    
+    //The following method computes the volume of the cell and  
+    //The weighted geometric centroid from tetrahedron decomposition
 
-    for (int i =0; i<3; i++){
+    for (int i = 0; i<3; i++){
         geoCentroid_[i] = 0.;
     }
     std::array<double, 3> ci; //face center to curr
     std::array<double, 3> cj; //face center to next
     std::array<double, 3> cc; //cell center to face center
-    std::array<double, 3> ctetra; // center of the tetrahedron 
+    std::array<double, 3> ctetra; // center of the tetrahedron
+
+    double newVolume = 0.; 
+    area_ = 0.;
     for (int i=0; i<polygons_.size(); i++){
-        Polygon* polygon  = polygons_[i];
+        Polygon* polygon = polygons_[i];
+        area_ += polygon->getArea();
         for (int j = 0; j<polygon->getVertices().size();j++){
             Vertex* curr = polygon->getVertices()[j];
             Vertex* next = polygon->getVertices()[(j+1)%polygon->getVertices().size()];
+            
             //Form two vectors from the polygon center to the edge vertices. 
+            const auto& p1 = curr->getPos();
+            const auto& p2 = next->getPos(); 
+            const auto& polyCentroid = polygon->getCentroid();
+
+            for (int i = 0; i<3; i++){
+                ci[i] = p1[i] - polyCentroid[i];
+                cj[i] = p2[i] - polyCentroid[i];
+                cc[i] = polyCentroid[i] - centroid_[i];
+                ctetra[i] = (p1[i]+p2[i]+polyCentroid[i]+centroid_[i])/4;
+            }
             
-            ci[0] = curr->getPos()[0]-polygon->getCentroid()[0];
-            cj[0] = next->getPos()[0]-polygon->getCentroid()[0];
-
-            ci[1] = curr->getPos()[1]-polygon->getCentroid()[1];
-            cj[1] = next->getPos()[1]-polygon->getCentroid()[1];
-
-            ci[2] = curr->getPos()[2]-polygon->getCentroid()[2];
-            cj[2] = next->getPos()[2]-polygon->getCentroid()[2];
-
-            //Form vector from cell centroid to face centroid
-            cc[0] = polygon->getCentroid()[0] - centroid_[0];
-            cc[1] = polygon->getCentroid()[1] - centroid_[1];
-            cc[2] = polygon->getCentroid()[2] - centroid_[2]; 
-
-            //Get the center of the tetrahedron
-            ctetra[0] = (curr->getPos()[0]+next->getPos()[0]+polygon->getCentroid()[0]+centroid_[0])/4;
-            ctetra[1] = (curr->getPos()[1]+next->getPos()[1]+polygon->getCentroid()[1]+centroid_[1])/4;
-            ctetra[2] = (curr->getPos()[2]+next->getPos()[2]+polygon->getCentroid()[2]+centroid_[2])/4;
-            
-
             //Take the cross product of curr cross next to get vector pointing out the cell 
-            //and dot with vector from cell center to face center to get positive signed volume 
-            geoCentroid_[0] += ctetra[0]*(cc[0]*(ci[1]*cj[2]-ci[2]*cj[1])/6);
-            geoCentroid_[1] += ctetra[1]*(cc[1]*(ci[2]*cj[0]-ci[0]*cj[2])/6);
-            geoCentroid_[2] += ctetra[2]*(cc[2]*(ci[0]*cj[1]-ci[1]*cj[0])/6);
-        }
-    }
-    for (int i =0; i<3;i++){
-        geoCentroid_[i]/= volume_;
-    }     
-}
+            //and dot with vector from cell center to face center to get positive signed volume
+            
+            double tetraVolume = ((ci[1]*cj[2]-ci[2]*cj[1])*cc[0] + (ci[2]*cj[0]-ci[0]*cj[2])*cc[1] + (ci[0]*cj[1]-ci[1]*cj[0])*cc[2])/6; 
 
-void Cell::updateVolume(){
-    //the following method uses a triangulation scheme taking the tetrahedron volumes formed by the cell centroid two edge vertices and the face centroids.
-    double newVolume = 0; 
-    for (const auto& polygon : polygons_){
-        std::array<double,3> polyCenter = polygon->getCentroid(); 
-        double ci[3] = {0,0,0}; //vector from the cell centroid to the first edge vertex 
-        double cj[3] = {0,0,0}; //vector from the cell centroid to the second edge vertex
-        double cc[3] = {0,0,0}; //vector from the cell centroid to the polygon center
-        for (const auto& edge : polygon->getEdges()){
-            std::array<double, 3> pos1 = edge->getVertices()[0]->getPos();
-            std::array<double, 3> pos2 = edge->getVertices()[1]->getPos();
-            ci[0] = pos1[0]-centroid_[0];
-            cj[0] = pos2[0]-centroid_[0];
-            ci[1] = pos1[1]-centroid_[1];
-            cj[1] = pos2[1]-centroid_[1];
-            ci[2] = pos1[2]-centroid_[2];
-            cj[2] = pos2[2]-centroid_[2];
-            cc[0] = polyCenter[0]-centroid_[0];
-            cc[1] = polyCenter[1]-centroid_[1];
-            cc[2] = polyCenter[2]-centroid_[2];
-        //Taking the triple product of the three vectors to compute the volume of the
-        //tetrahedron with vertices at the cell center, face center, and edges.
-        newVolume += std::abs((ci[1]*cj[2]-ci[2]*cj[1])*cc[0]);
-        newVolume += std::abs((ci[2]*cj[0]-ci[0]*cj[2])*cc[1]);
-        newVolume += std::abs((ci[0]*cj[1]-ci[1]*cj[0])*cc[2]);
+            geoCentroid_[0] += ctetra[0]*tetraVolume;
+            geoCentroid_[1] += ctetra[1]*tetraVolume;
+            geoCentroid_[2] += ctetra[2]*tetraVolume;
+
+            newVolume += tetraVolume;
         }
     }
-    volume_ = newVolume/6;
-}
-void Cell::updateArea(){
-    area_ = 0.; 
-    for (const auto& polygon : polygons_){
-        area_+=polygon->getArea();
-    }
+    volume_= newVolume;
+
+    for (int i =0; i<3;i++){
+        geoCentroid_[i] /= volume_;
+    }     
 }
 
 void Cell::update(){
     for (auto& polygon : polygons_){
         polygon->update();    
     }
-    updateCentroid();
-    updateArea();
+    updateGeometry();
 }
 
 void Cell::checkPolygonOrientations() {
         for (const auto& polygon : polygons_) {
             const auto& pv = polygon->getVertices();
+            const auto& polyCentroid = polygon->getCentroid(); 
             double totalCrossZ = 0.0;
             std::size_t n = pv.size();
             for (std::size_t i = 0; i < n; ++i) {
-                const auto& v1 = pv[i]->getPos();
-                const auto& v2 = pv[(i + 1) % n]->getPos();
+                const auto& p1 = pv[i]->getPos();
+                const auto& p2 = pv[(i + 1) % n]->getPos();
+                std::array<double, 3> ci, cj, cc; 
 
-                // Vectors from centroid to vertices
-                std::array<double, 3> vec1 = {v1[0] - polygon->getCentroid()[0], v1[1] - polygon->getCentroid()[1], v1[2] - polygon->getCentroid()[2]};
-                std::array<double, 3> vec2 = {v2[0] - polygon->getCentroid()[0], v2[1] - polygon->getCentroid()[1], v2[2] - polygon->getCentroid()[2]};
+                for (int i = 0; i<3; i++){
+                    ci[i] = p1[i] - polyCentroid[i];
+                    cj[i] = p2[i] - polyCentroid[i];
+                    cc[i] = polyCentroid[i] - centroid_[i];
+                }
 
                 // Cross product z-component
-                double crossX = (vec1[1] * vec2[2]) - (vec1[2] * vec2[1]);
-                double crossY = (vec1[2] * vec2[0]) - (vec1[0] * vec2[2]);
-                double crossZ = (vec1[0] * vec2[1]) - (vec1[1] * vec2[0]);
+                double crossX = (ci[1] * cj[2]) - (ci[2] * cj[1]);
+                double crossY = (ci[2] * cj[0]) - (ci[0] * cj[2]);
+                double crossZ = (ci[0] * cj[1]) - (ci[1] * cj[0]);
 
-                // Vector from cell center to face center:
-                std::array<double, 3> centerFace = {polygon->getCentroid()[0]-centroid_[0], polygon->getCentroid()[1]-centroid_[1], polygon->getCentroid()[2]-centroid_[2]};
                 // Find the angle between the vector from the cell center to face center and the surface vector
                 // a dot b = abcostheta
                 // theta = acos(a dot b/|a|b|)
-                double cosTheta = (centerFace[0]*crossX + centerFace[1]*crossY + centerFace[2]*crossZ)/(std::sqrt(std::pow(centerFace[0],2)+std::pow(centerFace[1],2)+std::pow(centerFace[2],2))*std::sqrt(std::pow(crossX,2)+std::pow(crossY,2)+std::pow(crossZ,2)));
+                double cosTheta = (cc[0]*crossX + cc[1]*crossY + cc[2]*crossZ)/(std::sqrt(std::pow(cc[0],2)+std::pow(cc[1],2)+std::pow(cc[2],2))*std::sqrt(std::pow(crossX,2)+std::pow(crossY,2)+std::pow(crossZ,2)));
                 //clamp values to [-1, 1]
                 cosTheta = std::max(-1.0, std::min(1.0, cosTheta));
                 double theta = std::acos(cosTheta);
-                if (theta>=1.57079632679){
+                if (theta>=M_PI_2){
                     throw std::invalid_argument("Polygon orientation error");
                 }
             }
         }
     }
-
-
