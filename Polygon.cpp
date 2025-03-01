@@ -5,15 +5,15 @@ Polygon::Polygon(std::vector<Vertex*> vertices, std::vector<Edge*> edges, int id
     update();
 }
 
-const int Polygon::getId() const{
+int Polygon::getId() const{
     return id_;
 }
 
-const double Polygon::getArea() const{
+double Polygon::getArea() const{
     return area_;
 }
 
-const double Polygon::getPerimeter() const{
+double Polygon::getPerimeter() const{
     return perimeter_;
 }
 
@@ -33,11 +33,11 @@ const std::array<double, 3>& Polygon::getCentroid() const{
     return centroid_;
 }
 
-const double Polygon::getKa() const{
+double Polygon::getKa() const{
     return Ka_;
 }
 
-const double Polygon::getGamma() const{
+double Polygon::getGamma() const{
     return gamma_;
 }
 
@@ -56,27 +56,20 @@ void Polygon::setGamma(double gamma){
 void Polygon::updateCentroid(){
     //the following method of calculating the centroid is inspired by ZhangTao's tvm code and uses a method of geometric decomposition
     
-    const std::array<double, 3>& tmpOrigin = edges_[0]->getVertices()[0]->getPos(); //reference vertex is the first vertex of the first edge in the polygon.
-    double sumLx = 0.;
-    double sumLy = 0.;
-    double sumLz = 0.;
-    double sumL = 0.;
+    const auto& tmpOrigin = edges_[0]->getVertices()[0]->getPos(); //reference vertex is the first vertex of the first edge in the polygon.
+    std::array<double, 3> sumL = {0.,0.,0.};
+    double totalLength = 0.;
     for (const auto& edge : edges_){
         double length = edge->getLength();
-        double dx[3];
         const auto& center = edge->getCentroid();
-        dx[0] = center[0] - tmpOrigin[0];
-        dx[1] = center[1] - tmpOrigin[1];
-        dx[2] = center[2] - tmpOrigin[2];
-        //check periodic BC on dx here
-        sumLx+=length*dx[0];
-        sumLy+=length*dx[1];
-        sumLz+=length*dx[2];
-        sumL += length; 
+        for (int i = 0; i<3; i++){
+            sumL[i]+= length * (center[i]-tmpOrigin[i]);
+        }
+        totalLength += length; 
     }
-    centroid_[0] = sumLx/sumL + tmpOrigin[0];
-    centroid_[1] = sumLy/sumL + tmpOrigin[1];
-    centroid_[2] = sumLz/sumL + tmpOrigin[2];
+    for (int i = 0; i<3; i++){
+        centroid_[i] = sumL[i]/totalLength+tmpOrigin[i];
+    }
 
     //the following method is the simplest way of calculating a centroid from the average vertex positions:
     /*
@@ -94,40 +87,31 @@ void Polygon::updateCentroid(){
 }
 
 void Polygon::updateArea(){
-    double areaVectorX;
-    double areaVectorY;
-    double areaVectorZ;
     area_ = 0.;
-    areaVector_[0] = 0.;
-    areaVector_[1] = 0.;
-    areaVector_[2] = 0.;
-    std::array<double, 3> ci;
-    std::array<double, 3> cj;
+    areaVector_ = {0., 0., 0.};
+    std::array<double, 3> ci, cj;
     for (const auto& edge : edges_){
-        std::array<double, 3> pos1 = edge->getVertices()[0]->getPos();
-        std::array<double, 3> pos2 = edge->getVertices()[1]->getPos();
+        const auto& pos1 = edge->getVertices()[0]->getPos();
+        const auto& pos2 = edge->getVertices()[1]->getPos();
 
         //Form two vectors from the polygon center to the edge vertices. 
-        ci[0] = pos1[0]-centroid_[0];
-        cj[0] = pos2[0]-centroid_[0];
-
-        ci[1] = pos1[1]-centroid_[1];
-        cj[1] = pos2[1]-centroid_[1];
-
-        ci[2] = pos1[2]-centroid_[2];
-        cj[2] = pos2[2]-centroid_[2];
-
+        for (int i = 0; i<3; i++){
+            ci[i] = pos1[i]-centroid_[i];
+            cj[i] = pos2[i]-centroid_[i];
+        }
         //Take the cross product of the two vectors to get the parallelogram area vector  
-        areaVectorX = (ci[1]*cj[2]-ci[2]*cj[1]);
-        areaVectorY = (ci[2]*cj[0]-ci[0]*cj[2]);
-        areaVectorZ = (ci[0]*cj[1]-ci[1]*cj[0]);
-
-        areaVector_[0] += areaVectorX;
-        areaVector_[1] += areaVectorY;
-        areaVector_[2] += areaVectorZ;
-        
+        std::array<double, 3> crossProduct = {
+            ci[1]*cj[2]-ci[2]*cj[1], 
+            ci[2]*cj[0]-ci[0]*cj[2],
+            ci[0]*cj[1]-ci[1]*cj[0]
+        };
+        for (int i = 0; i<3; i++){
+            areaVector_[i]+=crossProduct[i];
+        }
         //Take half the norm of the area vector to get the triangular area
-        area_ += 0.5*std::sqrt(std::pow(areaVectorX,2)+std::pow(areaVectorY,2)+std::pow(areaVectorZ,2));
+        area_ += 0.5*std::sqrt(crossProduct[0] * crossProduct[0] + 
+                               crossProduct[1] * crossProduct[1] + 
+                               crossProduct[2] * crossProduct[2]);
     }
 }
 
