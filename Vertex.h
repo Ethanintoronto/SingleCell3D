@@ -15,7 +15,7 @@ public:
 
     const std::array<double,3>& getForce() const; //Getter method for the vertex position 
     
-    const int getId() const; //Getter method for the vertex id
+    int getId() const; //Getter method for the vertex id
 
     void setPos(std::array<double,3> pos); //Setter method for the vertex position
 

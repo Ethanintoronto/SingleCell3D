@@ -9,7 +9,7 @@ const std::array<double,3>& Vertex::getForce() const{
     return force_;
 }
 
-const int Vertex::getId() const{
+int Vertex::getId() const{
     return id_;
 }
 
