@@ -39,5 +39,7 @@ private:
     std::array<double, 3> dAShoeLace(Vertex* prev, Vertex* next, int faceNorm);
 
 public:
-    explicit Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, int id, double period, double timestep, int numTimesteps, double eta, int log, bool write);
+    explicit Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, 
+        int id, double period, double timestep, int numTimesteps, double eta, int log, 
+        bool write);
 };

@@ -7,8 +7,12 @@
 #include <filesystem>
 #include <algorithm>
 #include <ctime>
-#include <iomanip>
-Simulation::Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, int id, double period, double timestep, int numTimesteps, double eta, int log, bool write): cells_(cells), polygons_(polygons), edges_(edges), vertices_(vertices), id_(id), period_(period),timestep_(timestep),numTimesteps_(numTimesteps), eta_(eta), log_(log),time_(0),write_(write){
+Simulation::Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, 
+    int id, double period, double timestep, int numTimesteps, double eta, int log, 
+    bool write): 
+    cells_(cells), polygons_(polygons), edges_(edges), vertices_(vertices), 
+    id_(id), period_(period),timestep_(timestep),numTimesteps_(numTimesteps), eta_(eta), log_(log),time_(0),
+    write_(write){
     Run();
 }
 void Simulation::Run(){
@@ -16,6 +20,7 @@ void Simulation::Run(){
         writeVolume();
         writeArea();
         writeCellCentroid();
+        writeCellGeoCentroid();
         writeEnergy();
         writeVTK();
         writeMaxForce();
@@ -135,7 +140,7 @@ void Simulation::updateCells(){
 }
 
 void Simulation::update(){
-    int midsteps = 101;
+    int midsteps = 1;
     for (int i=0; i<midsteps;i++){
         updateCells();
         updateForces();
@@ -145,6 +150,7 @@ void Simulation::update(){
         writeVolume();
         writeArea();
         writeCellCentroid();
+        writeCellGeoCentroid();
         //writeEnergy();
         writeVTK();
         writeMaxForce();
@@ -157,7 +163,7 @@ void Simulation::performTimeStep(){
         std::array<double, 3> newpos = {0,0,0};
         for (int i=0; i<3; i++){
             if (i==2 && vertex->getForce()[i]<0){
-                newpos[i] = vertex->getPos()[i] + eta_*vertex->getForce()[i]*timestep_;
+                newpos[i] = vertex->getPos()[i];
             }
             else{
                 newpos[i] = vertex->getPos()[i] + eta_*vertex->getForce()[i]*timestep_; 
@@ -338,20 +344,20 @@ void Simulation::writeEnergy(){
     }
     std::ostringstream filename;
     filename << dataDir.str()<<"/Single_cell_Energy_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<< ".txt";
-    std::ofstream volumeFile;
+    std::ofstream energyFile;
     if (time_ ==0){
-        volumeFile.open(filename.str(), std::ios::trunc);
+        energyFile.open(filename.str(), std::ios::trunc);
     }
     else {
-        volumeFile.open(filename.str(), std::ios::app);
+        energyFile.open(filename.str(), std::ios::app);
     }
-    if (!volumeFile.is_open()) {
+    if (!energyFile.is_open()) {
         std::cerr << "Error opening the force file for writing!" << std::endl;
         return;
     }
-    volumeFile<<time_*timestep_<<","<< cells_[0]->getEnergy()<<"\n";
+    energyFile<<time_*timestep_<<","<< cells_[0]->getEnergy()<<"\n";
     // Close the file
-    volumeFile.close();
+    energyFile.close();
 }
 
 void Simulation::writeArea(){
@@ -432,21 +438,21 @@ void Simulation::writeCellGeoCentroid(){
     std::ostringstream filename;
     filename << dataDir.str()<<"/Single_cell_GeoCentroid_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_V0_"<<convertDouble(cells_[0]->getV0())<<"_A0_"<<convertDouble(cells_[0]->getA0())<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<< ".txt";
 
-    std::ofstream centroidFile;
+    std::ofstream geoCentroidFile;
     if (time_ ==0){
-        centroidFile.open(filename.str(), std::ios::trunc);
+        geoCentroidFile.open(filename.str(), std::ios::trunc);
     }
     else {
-        centroidFile.open(filename.str(), std::ios::app);
+        geoCentroidFile.open(filename.str(), std::ios::app);
     }
 
-    if (!centroidFile.is_open()) {
+    if (!geoCentroidFile.is_open()) {
         std::cerr << "Error opening the force file for writing!" << std::endl;
         return;
     }
-    centroidFile<<time_*timestep_<<","<< cells_[0]->getGeoCentroid()[0]<<","<< cells_[0]->getGeoCentroid()[1]<<","<< cells_[0]->getGeoCentroid()[2]<<"\n";
+    geoCentroidFile<<time_*timestep_<<","<< cells_[0]->getGeoCentroid()[0]<<","<< cells_[0]->getGeoCentroid()[1]<<","<< cells_[0]->getGeoCentroid()[2]<<"\n";
     // Close the file
-    centroidFile.close();
+    geoCentroidFile.close();
 }
 
 std::array<double, 3> Simulation::dAdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, int N_p){
