@@ -10,16 +10,18 @@ V0 = "1"
 A0 = "6"
 gamma = "2"
 timestep = "0p001"
-id = "007"
+id = "000"
 base = "_gamma_"+gamma+"_V0_"+V0+"_A0_"+A0+"_timestep_"+timestep+"_"+id
 run = "\\data\\"+date+"\\"+date+base+"\\"
-tests =  ["Area", "Centroid", "Volume", "MaxForce"]
+tests =  ["Area", "Centroid", "Volume", "MaxForce", "GeoCentroid"]
 plot = ["Single_cell_"+x+base+".txt" for x in tests]
 filenames = [dir + run + file for file in plot] 
 
 for index, file in enumerate(filenames):
     if tests[index] == "Centroid":
         labels = ["Centroid_x", "Centroid_y","Centroid_z"]
+    elif tests[index] == "GeoCentroid":
+        labels = ["GeoCentroid_x","GeoCentroid_y","GeoCentroid_z"]
     elif tests[index] == "MaxForce":
         labels = ["MaxForce", "MaxForce_x","MaxForce_y","MaxForce_z"]
     else:
