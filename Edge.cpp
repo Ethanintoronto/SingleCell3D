@@ -9,11 +9,11 @@ const std::array<Vertex*,2>& Edge::getVertices() const{
     return vertices_;
 }
 
-const double Edge::getLength() const{
+double Edge::getLength() const{
     return length_;
 }
 
-const int Edge::getId() const{
+int Edge::getId() const{
     return id_;
 }
 

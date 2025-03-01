@@ -13,9 +13,9 @@ public:
 
     const std::array<Vertex*,2>& getVertices() const;
 
-    const int getId() const;
+    int getId() const;
 
-    const double getLength() const; 
+    double getLength() const; 
 
     const std::array<double, 3>& getCentroid() const;
 
