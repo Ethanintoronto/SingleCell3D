@@ -110,59 +110,129 @@ void readVTKAndCreateObjects(const std::string& filePath,
             }
         }
         Polygon* polygon = new Polygon(faceVertices, faceEdges, polygonId++);
-        polygons.push_back(polygon);
-        //polygons.push_back(new Polygon(faceVertices, faceEdges, polygonId++));        
+        polygons.push_back(polygon);      
     }
 }
 
 int main() {
-    std::vector<Vertex*> vertices;
-    std::vector<Edge*> edges;
-    std::vector<Polygon*> polygons;
+    int id = 106;
+    bool batchMode = false;
+    if (batchMode){
+        int id = 6;
+        double period_inc = 50; 
+        double gamma = 1;
+        double gamma_inc = 1;
+        for (int i = 0; i<10; i++){
+            double period = 250;
+            for (int j = 0; j<10; j++){
+                std::vector<Vertex*> vertices;
+                std::vector<Edge*> edges;
+                std::vector<Polygon*> polygons;
+                // Initialize Simulation Parameters:
+                std::string shape = "cube";
+                double mu = 1.0;
+                double V0 = 1.; 
+                double A0 = 6.;
+                double Kv = 10.;
+                double Ka = 1.;
+                double Ks = 1.;
 
-    // Initialize Simulation Parameters:
-    std::string shape = "cube";
-    double eta = 1.0;
-    double timestep = 0.001; 
-    double V0 = 1; 
-    double A0 = 6;
-    double gamma = 2;
-    double Kv = 10.;
-    double KaCell = 1;
-    double KaPoly = 5;
-    double period = 500;
-    int numTimesteps = period*10; 
-    int id = 7;
+                //period = 500 timesteps = 5 tau = 2.5 min
+                double tau = 1/(mu*Kv*V0); //0.1 
+                double timestep = 0.01*tau; 
 
-    int log = period/10; 
-    bool write = true;
+                //run for 4 periods + 60 tau 
+                //int numTimesteps = period*4 + 100*60; //100 integration timesteps/tau * 60 tau
+                int numTimesteps = 2000 + 100*60;
+                int log = period/10; 
+                bool write = true;
 
-    std::string vtkFilePath = std::string("vtk_in//")+shape+std::string(".vtk"); 
-    readVTKAndCreateObjects(vtkFilePath, vertices, edges, polygons);
-    
-    //Set gamma parameters
-    for (Polygon* polygon :polygons){
-        polygon->setKa(KaPoly);
-        if (polygon->getId() == 2){
-            polygon->setGamma(gamma);
-        }
-        else if (polygon->getId() == 5){
-            polygon->setGamma(-1*gamma);
+                std::string vtkFilePath = std::string("vtk_in//")+shape+std::string(".vtk"); 
+                readVTKAndCreateObjects(vtkFilePath, vertices, edges, polygons);
+                
+                //Set gamma parameters
+                for (Polygon* polygon :polygons){
+                    polygon->setKs(Ks);
+                    if (polygon->getId() == 2){
+                        polygon->setGamma(gamma);
+                    }
+                    else if (polygon->getId() == 5){
+                        polygon->setGamma(-1*gamma);
+                        polygon->setKs(10.);
+                    }
+                }
+                std::vector<Cell*> cells;
+                Cell* cell = new Cell(vertices, polygons, 0, V0, A0);
+                cell->setKv(Kv);
+                cell->setKa(Ka); 
+                cells.push_back(cell);
+                std::cout << "Starting Simulation\n"; 
+                Simulation sim(cells, polygons, edges, vertices, id, period, timestep, numTimesteps, mu, log, write); 
+
+                // Cleanup dynamically allocated objects
+                for (auto vertex : vertices) delete vertex;
+                for (auto edge : edges) delete edge;
+                for (auto polygon : polygons) delete polygon;
+                for (auto cell:cells) delete cell;
+
+                id++;
+                period += period_inc;
+            }
+            gamma+= gamma_inc;
         }
     }
-    std::vector<Cell*> cells;
-    Cell* cell = new Cell(vertices, polygons, 0, V0, A0);
-    cell->setKv(Kv);
-    cell->setKa(KaCell); 
-    cells.push_back(cell);
-    std::cout << "Starting Simulation\n"; 
-    Simulation sim(cells, polygons, edges, vertices, id, period, timestep, numTimesteps, eta, log, write); 
+    else{
+        std::vector<Vertex*> vertices;
+        std::vector<Edge*> edges;
+        std::vector<Polygon*> polygons;
+        // Initialize Simulation Parameters:
+        std::string shape = "cube";
+        double mu = 1.0;
+        double V0 = 1.; 
+        double A0 = 6.;
+        double gamma = 2.;
+        double Kv = 10.;
+        double Ka = 1.;
+        double Ks = 1.;
+        double KsTrailing = 10.;
+        double period = 250;
 
-    // Cleanup dynamically allocated objects
-    for (auto vertex : vertices) delete vertex;
-    for (auto edge : edges) delete edge;
-    for (auto polygon : polygons) delete polygon;
-    for (auto cell:cells) delete cell;
+        //period = 500 timesteps = 5 tau = 2.5 min
+        double tau = 1/(mu*Kv*V0); //0.1 
+        double timestep = 0.01*tau; 
 
+        //run for 4 periods + 60 tau 
+        int numTimesteps = period*4 + 100*60; //100 integration timesteps/tau * 60 tau
+        int log = period/10; 
+        bool write = true;
+
+        std::string vtkFilePath = std::string("vtk_in//")+shape+std::string(".vtk"); 
+        readVTKAndCreateObjects(vtkFilePath, vertices, edges, polygons);
+        
+        //Set gamma parameters
+        for (Polygon* polygon :polygons){
+            polygon->setKs(Ks);
+            if (polygon->getId() == 2){
+                polygon->setGamma(gamma);
+            }
+            else if (polygon->getId() == 5){
+                polygon->setGamma(-1*gamma);
+                polygon->setKs(KsTrailing);
+            }
+        }
+        std::vector<Cell*> cells;
+        Cell* cell = new Cell(vertices, polygons, 0, V0, A0);
+        cell->setKv(Kv);
+        cell->setKa(Ka); 
+        cells.push_back(cell);
+        std::cout << "Starting Simulation\n"; 
+        Simulation sim(cells, polygons, edges, vertices, id, period, timestep, numTimesteps, mu, log, write); 
+
+        // Cleanup dynamically allocated objects
+        for (auto vertex : vertices) delete vertex;
+        for (auto edge : edges) delete edge;
+        for (auto polygon : polygons) delete polygon;
+        for (auto cell:cells) delete cell;
+    }
     return 0;
 }
