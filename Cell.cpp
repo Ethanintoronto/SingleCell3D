@@ -1,7 +1,6 @@
 #include "Cell.h"
 #include <cmath>
 #include <iostream>
-#include <cmath>
 Cell::Cell(std::vector<Vertex*> vertices, std::vector<Polygon*> polygons, int id, double V0, double A0): vertices_(vertices), polygons_(polygons), id_(id), V0_(V0), A0_(A0), Kv_(10.),Ka_(1.), area_(0.), centroid_({0.,0.,0.}),geoCentroid_({0.,0.,0.}), volume_(0.){
     update();
     checkPolygonOrientations();

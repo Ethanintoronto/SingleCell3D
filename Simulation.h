@@ -7,7 +7,7 @@ private:
     int id_;
     double timestep_;
     int numTimesteps_;
-    double eta_;
+    double mu_;
     int log_;
     bool write_;
     double period_;
@@ -40,6 +40,6 @@ private:
 
 public:
     explicit Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, 
-        int id, double period, double timestep, int numTimesteps, double eta, int log, 
+        int id, double period, double timestep, int numTimesteps, double mu, int log, 
         bool write);
 };

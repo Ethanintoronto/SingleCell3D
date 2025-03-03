@@ -9,7 +9,7 @@ private:
 
     double perimeter_;
 
-    double Ka_;
+    double Ks_;
 
     double gamma_;
 
@@ -36,7 +36,7 @@ public:
 
     double getPerimeter() const;
 
-    double getKa() const;
+    double getKs() const;
 
     const std::vector<Edge*>& getEdges() const;
 
@@ -52,7 +52,7 @@ public:
 
     void setId(int id);
 
-    void setKa(double Ka);
+    void setKs(double Ks);
 
     void update();
     

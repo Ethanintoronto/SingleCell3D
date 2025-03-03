@@ -1,7 +1,7 @@
 #include "Polygon.h"
 #include <cmath>
 #include <iostream>
-Polygon::Polygon(std::vector<Vertex*> vertices, std::vector<Edge*> edges, int id): vertices_(vertices), edges_(edges), id_(id), Ka_(1.), areaVector_({0.,0.,0.}), centroid_({0.,0.,0.}), area_(0.), perimeter_(0.), gamma_(0.){
+Polygon::Polygon(std::vector<Vertex*> vertices, std::vector<Edge*> edges, int id): vertices_(vertices), edges_(edges), id_(id), Ks_(1.), areaVector_({0.,0.,0.}), centroid_({0.,0.,0.}), area_(0.), perimeter_(0.), gamma_(0.){
     update();
 }
 
@@ -33,8 +33,8 @@ const std::array<double, 3>& Polygon::getCentroid() const{
     return centroid_;
 }
 
-double Polygon::getKa() const{
-    return Ka_;
+double Polygon::getKs() const{
+    return Ks_;
 }
 
 double Polygon::getGamma() const{
@@ -45,8 +45,8 @@ void Polygon::setId(int id){
     id_ = id;
 }
 
-void Polygon::setKa(double Ka){
-    Ka_ = Ka;
+void Polygon::setKs(double Ks){
+    Ks_ = Ks;
 }
 
 void Polygon::setGamma(double gamma){
