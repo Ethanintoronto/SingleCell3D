@@ -7,6 +7,9 @@
 #include <fstream>
 #include <sstream>
 #include <map>
+#include <filesystem>
+#include <regex>
+#include <ctime>
 void readVTKAndCreateObjects(const std::string& filePath, 
                              std::vector<Vertex*>& vertices, 
                              std::vector<Edge*>& edges, 
@@ -113,12 +116,48 @@ void readVTKAndCreateObjects(const std::string& filePath,
         polygons.push_back(polygon);      
     }
 }
+int get_next_index(const std::string& directory) {
+    std::regex pattern(R"(_(\d{3})$)"); // Matches "_000", "_001", etc. at the end of filenames
+    if (!std::filesystem::exists(directory) || std::filesystem::is_empty(directory)) {
+        return 0; // Return 0 if the directory does not exist or is empty
+    }
+    int max_index = -1;
+
+    for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+        if (entry.is_directory()) {
+            std::smatch match;
+            std::string dirname = entry.path().stem().string(); // Get dirname without extension
+
+            if (std::regex_search(dirname, match, pattern)) {
+                int num = std::stoi(match[1]); // Extract integer
+                max_index = std::max(max_index, num);
+            }
+        }
+    }
+
+    return max_index + 1;
+}
+
+std::string getDate() {
+    // Get the current time
+    std::time_t t = std::time(nullptr);
+
+    // Convert it to a tm structure
+    std::tm* now = std::localtime(&t);
+
+    // Create a string stream to format the date
+    std::ostringstream date_stream;
+    date_stream << std::put_time(now, "%Y-%m-%d"); // Format: YYYY-MM-DD
+
+    // Get the formatted date as a string
+    std::string date_str = date_stream.str();
+
+    return date_str;
+}
 
 int main() {
-    int id = 106;
     bool batchMode = false;
     if (batchMode){
-        int id = 6;
         double period_inc = 50; 
         double gamma = 1;
         double gamma_inc = 1;
@@ -130,12 +169,16 @@ int main() {
                 std::vector<Polygon*> polygons;
                 // Initialize Simulation Parameters:
                 std::string shape = "cube";
+                std::string directory = "data/" + getDate(); 
+                int id = get_next_index(directory);
                 double mu = 1.0;
                 double V0 = 1.; 
                 double A0 = 6.;
                 double Kv = 10.;
                 double Ka = 1.;
                 double Ks = 1.;
+                bool boundary = true;
+                int midSteps = 1000;
 
                 //period = 500 timesteps = 5 tau = 2.5 min
                 double tau = 1/(mu*Kv*V0); //0.1 
@@ -166,43 +209,49 @@ int main() {
                 cell->setKv(Kv);
                 cell->setKa(Ka); 
                 cells.push_back(cell);
-                std::cout << "Starting Simulation\n"; 
+                std::cout << "Starting Simulation: " <<std::setfill('0') <<std::setw(3) << id<<std::endl; 
                 Simulation sim(cells, polygons, edges, vertices, id, period, timestep, numTimesteps, mu, log, write); 
+                sim.setBoundary(boundary);
+                sim.setMidSteps(midSteps);
+                sim.Run();
 
                 // Cleanup dynamically allocated objects
                 for (auto vertex : vertices) delete vertex;
                 for (auto edge : edges) delete edge;
                 for (auto polygon : polygons) delete polygon;
                 for (auto cell:cells) delete cell;
-
-                id++;
                 period += period_inc;
             }
             gamma+= gamma_inc;
         }
     }
-    else{
+    else if (!batchMode){
         std::vector<Vertex*> vertices;
         std::vector<Edge*> edges;
         std::vector<Polygon*> polygons;
         // Initialize Simulation Parameters:
+
         std::string shape = "cube";
+        std::string directory = "data/" + getDate(); 
+        int id = get_next_index(directory);
         double mu = 1.0;
-        double V0 = 1.; 
-        double A0 = 6.;
+        double V0 = 1; 
+        double A0 = 6;
         double gamma = 2.;
         double Kv = 10.;
         double Ka = 1.;
-        double Ks = 1.;
-        double KsTrailing = 10.;
-        double period = 250;
+        double Ks = 5.;
+        double KsTrailing = 5.;
+        double period = 500;
+        bool boundary = true;
+        int midSteps = 1000;
 
-        //period = 500 timesteps = 5 tau = 2.5 min
         double tau = 1/(mu*Kv*V0); //0.1 
         double timestep = 0.01*tau; 
 
         //run for 4 periods + 60 tau 
-        int numTimesteps = period*4 + 100*60; //100 integration timesteps/tau * 60 tau
+        int numTimesteps = period*4 + 100*60; //timesteps/log = timesteps/period * periods/log = 500 * 1/10 
+
         int log = period/10; 
         bool write = true;
 
@@ -225,9 +274,11 @@ int main() {
         cell->setKv(Kv);
         cell->setKa(Ka); 
         cells.push_back(cell);
-        std::cout << "Starting Simulation\n"; 
+        std::cout << "Starting Simulation: " <<std::setfill('0') <<std::setw(3) << id<<std::endl; 
         Simulation sim(cells, polygons, edges, vertices, id, period, timestep, numTimesteps, mu, log, write); 
-
+        sim.setBoundary(boundary);
+        sim.setMidSteps(midSteps);
+        sim.Run();
         // Cleanup dynamically allocated objects
         for (auto vertex : vertices) delete vertex;
         for (auto edge : edges) delete edge;
