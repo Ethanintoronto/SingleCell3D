@@ -12,8 +12,7 @@ Simulation::Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons,
     bool write): 
     cells_(cells), polygons_(polygons), edges_(edges), vertices_(vertices), 
     id_(id), period_(period),timestep_(timestep),numTimesteps_(numTimesteps), mu_(mu), log_(log),time_(0),
-    write_(write){
-    Run();
+    write_(write), boundary_(true), midSteps_(0){
 }
 void Simulation::Run(){
     if (write_ && time_==0){
@@ -21,12 +20,10 @@ void Simulation::Run(){
         writeArea();
         writeCellCentroid();
         writeCellGeoCentroid();
-        //writeEnergy();
         writeVTK();
-        writeMaxForce();
         time_++;
     }
-    while (time_<numTimesteps_){
+    while (time_<=numTimesteps_){
         update();
         time_++;
     }
@@ -140,8 +137,7 @@ void Simulation::updateCells(){
 }
 
 void Simulation::update(){
-    int midsteps = 0;
-    for (int i=0; i<midsteps+1;i++){
+    for (int i=0; i<midSteps_+1;i++){
         updateCells();
         updateForces();
         performTimeStep();
@@ -153,18 +149,17 @@ void Simulation::update(){
         writeCellGeoCentroid();
         //writeEnergy();
         writeVTK();
-        //writeMaxForce();
+        writeMaxForce();
     }
 }
 
 void Simulation::performTimeStep(){
     for (const auto& vertex : vertices_){
-        vertex->updateHist();
+        //vertex->updateHist();
         std::array<double, 3> newpos = {0,0,0};
         for (int i=0; i<3; i++){
-            if (i==2 && vertex->getForce()[i]<0){
-                newpos[i] = vertex->getPos()[i];
-                //newpos[i] = vertex->getPos()[i] + mu_*vertex->getForce()[i]*timestep_; 
+            if (i==2 && vertex->getForce()[i]<0 && boundary_){
+                newpos[i] = vertex->getPos()[i]; 
             }
             else{
                 newpos[i] = vertex->getPos()[i] + mu_*vertex->getForce()[i]*timestep_; 
@@ -279,6 +274,15 @@ void Simulation::writeMaxForce(){
     std::ostringstream dataDir;
     dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
     if (!std::filesystem::exists(dataDir.str())){
+        if(std::filesystem::create_directories(dataDir.str())){
+            std::cout <<"Datadir created successfully\n";
+        }
+        else{
+            std::cout <<"Failed to create directory\n";
+        }
+    }
+    else if (time_<=log_){
+        std::filesystem::remove_all(dataDir.str());
         if(std::filesystem::create_directories(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
         }
@@ -580,15 +584,29 @@ std::string Simulation::getDate() {
 
     return date_str;
 }
-const int Simulation::getId() const{
+int Simulation::getId() const{
     return id_;
+}
+int Simulation::getMidSteps() const{
+    return midSteps_;
 }
 void Simulation::setId(int id){
     id_ = id;
 }
+void Simulation::setMidSteps(int midsteps){
+    midSteps_ = midsteps;
+}
 void Simulation::setPeriod(double period){
     period_= period;
 }
-const double Simulation::getPeriod() const{
+
+void Simulation::setBoundary(bool boundary){
+    boundary_ = boundary;
+}
+
+double Simulation::getPeriod() const{
     return period_;
+}
+bool Simulation::getBoundary() const{
+    return boundary_;
 }
