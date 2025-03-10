@@ -11,7 +11,7 @@ private:
     int log_;
     bool write_;
     bool boundary_;
-    double period_;
+    int period_;
     int midSteps_;
     std::vector<Cell*> cells_; 
     std::vector<Vertex*> vertices_;
@@ -34,14 +34,14 @@ private:
     std::string convertDouble(double val);
     std::string getDate();
     int getId() const;
-    double getPeriod() const;
+    int getPeriod() const;
     std::array<double, 3> dAdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, int N_p);
     std::array<double, 3> dVdr(Vertex* current, Vertex* prev, Vertex* next, std::array<double,3> polyCenter, std::array<double,3> cellCenter, int N_p, int N_c);
     std::array<double, 3> dAShoeLace(Vertex* prev, Vertex* next, int faceNorm);
 
 public:
     explicit Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, 
-        int id, double period, double timestep, int numTimesteps, double mu, int log, 
+        int id, int period, double timestep, int numTimesteps, double mu, int log, 
         bool write);
     void Run();
     void setBoundary(bool boundary);

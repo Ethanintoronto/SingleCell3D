@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <ctime>
 Simulation::Simulation(std::vector<Cell*> cells, std::vector<Polygon*> polygons, std::vector<Edge*> edges, std::vector<Vertex*> vertices, 
-    int id, double period, double timestep, int numTimesteps, double mu, int log, 
+    int id, int period, double timestep, int numTimesteps, double mu, int log, 
     bool write): 
     cells_(cells), polygons_(polygons), edges_(edges), vertices_(vertices), 
     id_(id), period_(period),timestep_(timestep),numTimesteps_(numTimesteps), mu_(mu), log_(log),time_(0),
@@ -604,7 +604,7 @@ void Simulation::setBoundary(bool boundary){
     boundary_ = boundary;
 }
 
-double Simulation::getPeriod() const{
+int Simulation::getPeriod() const{
     return period_;
 }
 bool Simulation::getBoundary() const{
