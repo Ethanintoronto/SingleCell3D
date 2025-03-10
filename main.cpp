@@ -156,14 +156,25 @@ std::string getDate() {
 }
 
 int main() {
-    bool batchMode = false;
+    bool batchMode = true;
     if (batchMode){
-        double period_inc = 50; 
-        double gamma = 1;
-        double gamma_inc = 1;
-        for (int i = 0; i<10; i++){
-            double period = 250;
-            for (int j = 0; j<10; j++){
+        int period_inc = 50; // 1 tau = 0.5 min, inc +50 = +0.5 tau = + 0.25 min  
+        double gamma = 0.5;
+        double gamma_inc = 0.25;
+        int num_periods = 10;
+        int num_gammas = 10;
+
+        double Ks = 0.5;
+        double Ks_inc = 0.5;
+        double KsTrailing_inc = 0.5;
+        for (int i = 0; i<num_gammas; i++){
+            
+            
+            //int period = 250;
+            double KsTrailing = Ks;
+
+
+            for (int j = 0; j<num_periods; j++){
                 std::vector<Vertex*> vertices;
                 std::vector<Edge*> edges;
                 std::vector<Polygon*> polygons;
@@ -176,9 +187,12 @@ int main() {
                 double A0 = 6.;
                 double Kv = 10.;
                 double Ka = 1.;
-                double Ks = 1.;
+                //double Ks = 1.;
+                double gamma = 2;
+                int period = 500;
+                //double KsTrailing = 10;
                 bool boundary = true;
-                int midSteps = 1000;
+                int midSteps = 0;
 
                 //period = 500 timesteps = 5 tau = 2.5 min
                 double tau = 1/(mu*Kv*V0); //0.1 
@@ -201,7 +215,7 @@ int main() {
                     }
                     else if (polygon->getId() == 5){
                         polygon->setGamma(-1*gamma);
-                        polygon->setKs(10.);
+                        polygon->setKs(KsTrailing);
                     }
                 }
                 std::vector<Cell*> cells;
@@ -220,9 +234,15 @@ int main() {
                 for (auto edge : edges) delete edge;
                 for (auto polygon : polygons) delete polygon;
                 for (auto cell:cells) delete cell;
-                period += period_inc;
+
+
+                //period += period_inc;
+                KsTrailing+=KsTrailing_inc;
             }
-            gamma+= gamma_inc;
+
+
+            //gamma+= gamma_inc;
+            Ks+= Ks_inc;
         }
     }
     else if (!batchMode){
