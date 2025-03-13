@@ -13,7 +13,7 @@
 void readVTKAndCreateObjects(const std::string& filePath, 
                              std::vector<Vertex*>& vertices, 
                              std::vector<Edge*>& edges, 
-                             std::vector<Polygon*>& polygons) { // Group polygons by cube_id 
+                             std::vector<Polygon*>& polygons) { // Group polygons by cube_id
     std::ifstream file(filePath);
     if (!file.is_open()) {
         throw std::runtime_error("Could not open file " + filePath);
@@ -147,7 +147,7 @@ void readVTKAndCreateObjects(const std::string& filePath,
         }
         // Create a polygon
         Polygon* polygon = new Polygon(faceVertices, faceEdges, polygonId++);
-        polygons.push_back(polygon);
+        polygons.push_back(polygon);      
     }
 
     // Create cells
@@ -160,6 +160,44 @@ void readVTKAndCreateObjects(const std::string& filePath,
         Cell* cell = new Cell(cellVertices, cellPolygons, cellId++, V0, A0);
     }
     
+}
+int get_next_index(const std::string& directory) {
+    std::regex pattern(R"(_(\d{3})$)"); // Matches "_000", "_001", etc. at the end of filenames
+    if (!std::filesystem::exists(directory) || std::filesystem::is_empty(directory)) {
+        return 0; // Return 0 if the directory does not exist or is empty
+    }
+    int max_index = -1;
+
+    for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+        if (entry.is_directory()) {
+            std::smatch match;
+            std::string dirname = entry.path().stem().string(); // Get dirname without extension
+
+            if (std::regex_search(dirname, match, pattern)) {
+                int num = std::stoi(match[1]); // Extract integer
+                max_index = std::max(max_index, num);
+            }
+        }
+    }
+
+    return max_index + 1;
+}
+
+std::string getDate() {
+    // Get the current time
+    std::time_t t = std::time(nullptr);
+
+    // Convert it to a tm structure
+    std::tm* now = std::localtime(&t);
+
+    // Create a string stream to format the date
+    std::ostringstream date_stream;
+    date_stream << std::put_time(now, "%Y-%m-%d"); // Format: YYYY-MM-DD
+
+    // Get the formatted date as a string
+    std::string date_str = date_stream.str();
+
+    return date_str;
 }
 
 
