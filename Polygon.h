@@ -13,6 +13,8 @@ private:
 
     double gamma_;
 
+    bool boundary_;
+
     std::vector<Vertex*> vertices_;
 
     std::vector<Edge*> edges_;
@@ -38,6 +40,8 @@ public:
 
     double getKs() const;
 
+    bool isBoundary() const;
+
     const std::vector<Edge*>& getEdges() const;
 
     const std::vector<Vertex*>& getVertices() const;
@@ -53,6 +57,8 @@ public:
     void setId(int id);
 
     void setKs(double Ks);
+
+    void setBoundary(bool boundary);
 
     void update();
     
