@@ -13,6 +13,7 @@ private:
     double A0_;
     std::array<double, 3> centroid_;
     std::array<double, 3> geoCentroid_;
+    std::vector<bool> polyOrientations_;
     std::vector<Polygon*> polygons_;
     std::vector<Vertex*> vertices_;
     void updateGeometry();
@@ -28,6 +29,7 @@ public:
     double getEnergy() const; 
     const std::array<double, 3>& getCentroid() const;
     const std::array<double, 3>& getGeoCentroid() const;
+    const std::vector<bool>& getPolyOrientations() const;
     int getId() const;
     const std::vector<Polygon*>& getPolygons() const;
     const std::vector<Vertex*>& getVertices() const;

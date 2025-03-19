@@ -2,8 +2,21 @@
 #include <cmath>
 #include <iostream>
 Cell::Cell(std::vector<Vertex*> vertices, std::vector<Polygon*> polygons, int id, double V0, double A0): vertices_(vertices), polygons_(polygons), id_(id), V0_(V0), A0_(A0), Kv_(10.),Ka_(1.), area_(0.), centroid_({0.,0.,0.}),geoCentroid_({0.,0.,0.}), volume_(0.){
-    update();
+    //the following method is the simplest way of calculating a centroid from the average of the vertex positions:
+    double nV = 0; 
+    std::array<double, 3> positionSum = {0.,0.,0.};
+    for (const auto& vert : vertices_){
+        nV++;
+        const auto& pos = vert->getPos();
+        for (int i =0; i<3; i++){
+            positionSum[i]+= pos[i];
+        }
+    }
+    for (int i = 0; i<3; i++){
+        centroid_[i] = positionSum[i]/nV;
+    }
     checkPolygonOrientations();
+    update();
 }
 
 int Cell::getId() const{
@@ -50,6 +63,9 @@ const std::array<double, 3>& Cell::getGeoCentroid() const{
     return geoCentroid_;
 }
 
+const std::vector<bool>& Cell::getPolyOrientations() const{
+    return polyOrientations_;
+}
 double Cell::getEnergy() const{
     return Ka_*std::pow((area_-A0_),2) + Kv_*std::pow((volume_-V0_),2);
 }
@@ -77,6 +93,9 @@ void Cell::setA0(double A0){
 void Cell::updateGeometry(){
     //Updates the centroid, area and volume of the cell 
     
+    //The following method computes the volume of the cell and  
+    //The weighted geometric centroid from tetrahedron decomposition
+
     //the following method is the simplest way of calculating a centroid from the average of the vertex positions:
     double nV = 0; 
     std::array<double, 3> positionSum = {0.,0.,0.};
@@ -90,9 +109,6 @@ void Cell::updateGeometry(){
     for (int i = 0; i<3; i++){
         centroid_[i] = positionSum[i]/nV;
     }
-    
-    //The following method computes the volume of the cell and  
-    //The weighted geometric centroid from tetrahedron decomposition
 
     for (int i = 0; i<3; i++){
         geoCentroid_[i] = 0.;
@@ -108,19 +124,32 @@ void Cell::updateGeometry(){
         Polygon* polygon = polygons_[i];
         area_ += polygon->getArea();
         for (int j = 0; j<polygon->getVertices().size();j++){
-            Vertex* curr = polygon->getVertices()[j];
-            Vertex* next = polygon->getVertices()[(j+1)%polygon->getVertices().size()];
+            Vertex* curr;
+            Vertex* next;
+            if (polyOrientations_[i]){
+                curr = polygon->getVertices()[j];
+                next = polygon->getVertices()[(j+1)%polygon->getVertices().size()];
+            }
+            else{
+                curr = polygon->getVertices()[j];
+                if (j==0){
+                    next = polygon->getVertices()[polygon->getVertices().size()-1];
+                }
+                else{
+                    next = polygon->getVertices()[j-1];
+                }
+            }
             
             //Form two vectors from the polygon center to the edge vertices. 
             const auto& p1 = curr->getPos();
             const auto& p2 = next->getPos(); 
             const auto& polyCentroid = polygon->getCentroid();
 
-            for (int i = 0; i<3; i++){
-                ci[i] = p1[i] - polyCentroid[i];
-                cj[i] = p2[i] - polyCentroid[i];
-                cc[i] = polyCentroid[i] - centroid_[i];
-                ctetra[i] = (p1[i]+p2[i]+polyCentroid[i]+centroid_[i])/4;
+            for (int k = 0; k<3; k++){
+                ci[k] = p1[k] - polyCentroid[k];
+                cj[k] = p2[k] - polyCentroid[k];
+                cc[k] = polyCentroid[k] - centroid_[k];
+                ctetra[k] = (p1[k]+p2[k]+polyCentroid[k]+centroid_[k])/4;
             }
             
             //Take the cross product of curr cross next to get vector pointing out the cell 
@@ -150,21 +179,25 @@ void Cell::update(){
 }
 
 void Cell::checkPolygonOrientations() {
-        for (const auto& polygon : polygons_) {
+        for (int h =0;h<polygons_.size(); h++) {
+            const auto& polygon = polygons_[h]; 
             const auto& pv = polygon->getVertices();
             const auto& polyCentroid = polygon->getCentroid(); 
-            double totalCrossZ = 0.0;
-            std::size_t n = pv.size();
-            for (std::size_t i = 0; i < n; ++i) {
+            std::array<double, 3> cc;
+            for (int j=0;j<3;j++){
+                cc[j] = polyCentroid[j] - centroid_[j];
+            }
+            
+            for (int i = 0; i < pv.size(); i++) {
                 const auto& p1 = pv[i]->getPos();
-                const auto& p2 = pv[(i + 1) % n]->getPos();
-                std::array<double, 3> ci, cj, cc; 
+                const auto& p2 = pv[(i + 1) % pv.size()]->getPos();
+                std::array<double, 3> ci, cj;
 
-                for (int i = 0; i<3; i++){
-                    ci[i] = p1[i] - polyCentroid[i];
-                    cj[i] = p2[i] - polyCentroid[i];
-                    cc[i] = polyCentroid[i] - centroid_[i];
+                for (int j = 0; j<3; j++){
+                    ci[j] = p1[j] - polyCentroid[j];
+                    cj[j] = p2[j] - polyCentroid[j];
                 }
+               
 
                 // Cross product z-component
                 double crossX = (ci[1] * cj[2]) - (ci[2] * cj[1]);
@@ -172,14 +205,25 @@ void Cell::checkPolygonOrientations() {
                 double crossZ = (ci[0] * cj[1]) - (ci[1] * cj[0]);
 
                 // Find the angle between the vector from the cell center to face center and the surface vector
-                // a dot b = abcostheta
+                // a dot b = |a| |b| costheta
                 // theta = acos(a dot b/|a|b|)
-                double cosTheta = (cc[0]*crossX + cc[1]*crossY + cc[2]*crossZ)/(std::sqrt(std::pow(cc[0],2)+std::pow(cc[1],2)+std::pow(cc[2],2))*std::sqrt(std::pow(crossX,2)+std::pow(crossY,2)+std::pow(crossZ,2)));
+                double cosTheta = (cc[0]*crossX + cc[1]*crossY + cc[2]*crossZ)/(std::sqrt(cc[0]*cc[0]+cc[1]*cc[1]+cc[2]*cc[2])*std::sqrt(crossX*crossX+crossY*crossY+crossZ*crossZ));
                 //clamp values to [-1, 1]
                 cosTheta = std::max(-1.0, std::min(1.0, cosTheta));
+
                 double theta = std::acos(cosTheta);
-                if (theta>=M_PI_2){
-                    throw std::invalid_argument("Polygon orientation error");
+                
+                if (i==0){
+                    if (theta>=M_PI_2){
+                        //throw std::invalid_argument("Polygon orientation error");
+                        polyOrientations_.push_back(false);
+                    }
+                    else {
+                        polyOrientations_.push_back(true);
+                    }   
+                }
+                else if ((theta>=M_PI_2 && polyOrientations_[h])||(theta<M_PI_2&&!polyOrientations_[h])){
+                    throw std::runtime_error("Inconsistent polygon direction in Cell: "+std::to_string(id_)+" Polygon: "+std::to_string(polygon->getId()) + " Vertex: " + std::to_string(i));
                 }
             }
         }
