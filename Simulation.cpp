@@ -60,8 +60,21 @@ void Simulation::updateForces(){
             double Pz_0 = polygon->getCentroid()[2];
             int N_p = polygon->getVertices().size();
             for (int k = 0; k<N_p; k++){
-                Vertex* vertex = polygon->getVertices()[k];
-                Vertex* next = polygon->getVertices()[(k+1)%N_p];
+                Vertex* vertex;
+                Vertex* next;
+                if(cell->getPolyOrientations()[j]){
+                    vertex = polygon->getVertices()[k];
+                    next = polygon->getVertices()[(k+1)%N_p];
+                }
+                else{
+                    vertex = polygon->getVertices()[k];
+                    if (k ==0){
+                        next = polygon->getVertices()[N_p-1];
+                    }
+                    else{
+                        next = polygon->getVertices()[k-1];
+                    }
+                }
                 double x_i = vertex->getPos()[0];
                 double y_i = vertex->getPos()[1];
                 double z_i = vertex->getPos()[2];
@@ -99,13 +112,24 @@ void Simulation::updateForces(){
             for (int k =  0; k<polygon->getVertices().size();k++){
                 Vertex* curr = polygon->getVertices()[k];
                 std::array<double,3> force =  curr->getForce();
-                if (k == 0){
-                    prev_k = polygon->getVertices().size()-1;
+                if(cell->getPolyOrientations()[j]){
+                    if (k == 0){
+                        prev_k = polygon->getVertices().size()-1;
+                    }
+                    else{
+                        prev_k = k-1;
+                    }
+                    next_k = (k+1)%polygon->getVertices().size();
                 }
                 else{
-                    prev_k = k-1;
+                    if (k == 0){
+                        next_k = polygon->getVertices().size()-1;
+                    }
+                    else{
+                        next_k = k-1;
+                    }
+                    prev_k = (k+1)%polygon->getVertices().size();
                 }
-                next_k = (k+1)%polygon->getVertices().size();
                 std::array<double,3> dAdr_k = dAdr(curr,polygon->getVertices()[prev_k],polygon->getVertices()[next_k],polygon->getCentroid(),polygon->getVertices().size());
                 std::array<double,3> dVdr_k = dVdr(curr, polygon->getVertices()[prev_k], polygon->getVertices()[next_k],polygon->getCentroid(), cell->getCentroid(), polygon->getVertices().size(), cell->getVertices().size());
                 std::array<double, 3> dAdr_k_polygon;
@@ -122,7 +146,13 @@ void Simulation::updateForces(){
                     phase = std::pow(std::cos(M_PI*time_/period_), 2); 
                 }
                 for (int l =0; l<3; l++){
-                    force[l] -=  2*cell->getKa()*(cell->getArea()-cell->getA0())*dAdr_k[l] + 2*cell->getKv()*(cell->getVolume()-cell->getV0())*dVdr_k[l] + std::abs(polygon->getGamma())*phase*dAdr_k_polygon[l] + 2*polygon->getKs()*(polygon->getArea()-1)*dAdr_k_polygon[l];
+                    if (polygon->isBoundary()){
+                        force[l] -=  2*cell->getKa()*(cell->getArea()-cell->getA0())*dAdr_k[l] + 2*cell->getKv()*(cell->getVolume()-cell->getV0())*dVdr_k[l] + std::abs(polygon->getGamma())*phase*dAdr_k_polygon[l] + 2*polygon->getKs()*(polygon->getArea()-1)*dAdr_k_polygon[l];
+                    }
+                    else{
+                        force[l] -=  2*cell->getKa()*(cell->getArea()-cell->getA0())*dAdr_k[l] + 2*cell->getKv()*(cell->getVolume()-cell->getV0())*dVdr_k[l] + 0.5*std::abs(polygon->getGamma())*phase*dAdr_k_polygon[l] + polygon->getKs()*(polygon->getArea()-1)*dAdr_k_polygon[l];
+                        //force[l] -=  2*cell->getKa()*(cell->getArea()-cell->getA0())*dAdr_k[l] + 2*cell->getKv()*(cell->getVolume()-cell->getV0())*dVdr_k[l] + 0.5*std::abs(polygon->getGamma())*phase*dAdr_k_polygon[l] + polygon->getKs()*(polygon->getArea()-1)*dAdr_k_polygon[l];
+                    }
                 }
                 curr->setForce(force);
             }
@@ -149,17 +179,17 @@ void Simulation::update(){
         writeCellGeoCentroid();
         //writeEnergy();
         writeVTK();
-        writeMaxForce();
+        //writeMaxForce();
     }
 }
 
 void Simulation::performTimeStep(){
     for (const auto& vertex : vertices_){
         //vertex->updateHist();
-        std::array<double, 3> newpos = {0,0,0};
+        std::array<double, 3> newpos;
         for (int i=0; i<3; i++){
-            if (i==2 && vertex->getForce()[i]<0 && boundary_){
-                newpos[i] = vertex->getPos()[i]; 
+            if (boundary_ && i==0 && vertex->getForce()[i]<0){
+                newpos[i] = vertex->getPos()[i];
             }
             else{
                 newpos[i] = vertex->getPos()[i] + mu_*vertex->getForce()[i]*timestep_; 
@@ -172,7 +202,7 @@ void Simulation::performTimeStep(){
 // Function to write simulation data in VTK format
 void Simulation::writeVTK() {
     std::ostringstream dataDir;
-    dataDir << "data/vtk/"<<getDate()<<"/"<<getDate()<<"_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
+    dataDir << "data/vtk/"<<getDate()<<"/"<<getDate()<<"_multi_gamma_"<<convertDouble(polygons_[12]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
     if (!std::filesystem::exists(dataDir.str())){
         if(std::filesystem::create_directories(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
@@ -191,7 +221,7 @@ void Simulation::writeVTK() {
         }
     }
     std::ostringstream filename;
-    filename << dataDir.str()<<"/"<<getDate()<<"_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<<"_"<< std::setw(3) << std::setfill('0') << time_ << ".vtk";
+    filename << dataDir.str()<<"/"<<getDate()<<"_multi_gamma_"<<convertDouble(polygons_[12]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<<"_"<< std::setw(3) << std::setfill('0') << time_ << ".vtk";
     std::ofstream vtkFile(filename.str(), std::ios::trunc);
     if (!vtkFile.is_open()) {
         std::cerr << "Error opening the VTK file for writing!" << std::endl;
@@ -205,14 +235,17 @@ void Simulation::writeVTK() {
     vtkFile << "DATASET POLYDATA\n";
 
     // Write vertices
-    vtkFile << "POINTS " << vertices_.size()+1 << " float\n";
+    vtkFile << "POINTS " << vertices_.size()+4 << " float\n";
     for (const auto& vertex : vertices_) {
         const auto& pos = vertex->getPos();
         vtkFile << pos[0] << " " << pos[1] << " " << pos[2] << "\n";
     }
-    // add the geoCentroid vertex 
-    const auto& geoCentroid = cells_[0]->getGeoCentroid();
-    vtkFile << geoCentroid[0] << " " << geoCentroid[1] << " " << geoCentroid[2] << "\n";
+    // add the geoCentroid vertices 
+    for (const auto& cell : cells_){
+        const auto& geoCentroid = cell->getGeoCentroid();
+        vtkFile << geoCentroid[0] << " " << geoCentroid[1] << " " << geoCentroid[2] << "\n";
+    }
+
 
     // Write edges
     vtkFile << "LINES " << edges_.size() << " " << edges_.size() * 3 << "\n";
@@ -272,7 +305,7 @@ void Simulation::writeMaxForce(){
 
     //Open file:
     std::ostringstream dataDir;
-    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
+    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_multi_gamma_"<<convertDouble(polygons_[12]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
     if (!std::filesystem::exists(dataDir.str())){
         if(std::filesystem::create_directories(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
@@ -291,7 +324,7 @@ void Simulation::writeMaxForce(){
         }
     }
     std::ostringstream filename;
-    filename << dataDir.str()<<"/Single_cell_MaxForce_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<<".txt";
+    filename << dataDir.str()<<"/Single_cell_MaxForce_gamma_"<<convertDouble(polygons_[12]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<<".txt";
     std::ofstream forceFile;
     if (time_ ==0){
         forceFile.open(filename.str(), std::ios::trunc);
@@ -304,14 +337,14 @@ void Simulation::writeMaxForce(){
         return;
     }
 
-    forceFile<<time_*timestep_<<","<< max_force<<","<< max_forcex<<","<< max_forcey<<","<< max_forcez<<"\n";
+    forceFile<<time_<<","<< max_force<<","<< max_forcex<<","<< max_forcey<<","<< max_forcez<<"\n";
     // Close the file
     forceFile.close();
 }
 void Simulation::writeVolume(){
     //Open file:
     std::ostringstream dataDir;
-    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
+    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_multi_gamma_"<<convertDouble(polygons_[12]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
     if (!std::filesystem::exists(dataDir.str())){
         if(std::filesystem::create_directories(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
@@ -321,7 +354,7 @@ void Simulation::writeVolume(){
         }
     }
     std::ostringstream filename;
-    filename << dataDir.str()<<"/Single_cell_Volume_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<< ".txt";
+    filename << dataDir.str()<<"/Single_cell_Volume_gamma_"<<convertDouble(polygons_[12]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<< ".txt";
     std::ofstream volumeFile;
     if (time_ ==0){
         volumeFile.open(filename.str(), std::ios::trunc);
@@ -333,7 +366,11 @@ void Simulation::writeVolume(){
         std::cerr << "Error opening the force file for writing!" << std::endl;
         return;
     }
-    volumeFile<<time_*timestep_<<","<< cells_[0]->getVolume()<<"\n";
+    volumeFile<<time_;
+    for (const auto& cell : cells_){
+       volumeFile<<","<< cell->getVolume();
+    }
+    volumeFile<<"\n";
     // Close the file
     volumeFile.close();
 }
@@ -341,7 +378,7 @@ void Simulation::writeVolume(){
 void Simulation::writeEnergy(){
     //Open file:
     std::ostringstream dataDir;
-    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
+    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_multi_gamma_"<<convertDouble(polygons_[12]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
     if (!std::filesystem::exists(dataDir.str())){
         if(std::filesystem::create_directories(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
@@ -351,7 +388,7 @@ void Simulation::writeEnergy(){
         }
     }
     std::ostringstream filename;
-    filename << dataDir.str()<<"/Single_cell_Energy_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<< ".txt";
+    filename << dataDir.str()<<"/Single_cell_Energy_gamma_"<<convertDouble(polygons_[12]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<< ".txt";
     std::ofstream energyFile;
     if (time_ ==0){
         energyFile.open(filename.str(), std::ios::trunc);
@@ -363,7 +400,7 @@ void Simulation::writeEnergy(){
         std::cerr << "Error opening the force file for writing!" << std::endl;
         return;
     }
-    energyFile<<time_*timestep_<<","<< cells_[0]->getEnergy()<<"\n";
+    energyFile<<time_<<","<< cells_[0]->getEnergy()<<"\n";
     // Close the file
     energyFile.close();
 }
@@ -371,7 +408,7 @@ void Simulation::writeEnergy(){
 void Simulation::writeArea(){
     //Open file:
     std::ostringstream dataDir;
-    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
+    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_multi_gamma_"<<convertDouble(polygons_[12]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
     if (!std::filesystem::exists(dataDir.str())){
         if(std::filesystem::create_directories(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
@@ -381,7 +418,7 @@ void Simulation::writeArea(){
         }
     }
     std::ostringstream filename;
-    filename << dataDir.str()<<"/Single_cell_Area_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<< ".txt";
+    filename << dataDir.str()<<"/Single_cell_Area_gamma_"<<convertDouble(polygons_[12]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<< ".txt";
     std::ofstream areaFile;
     if (time_ ==0){
         areaFile.open(filename.str(), std::ios::trunc);
@@ -394,7 +431,11 @@ void Simulation::writeArea(){
         std::cerr << "Error opening the force file for writing!" << std::endl;
         return;
     }
-    areaFile<<time_*timestep_<<","<< cells_[0]->getArea()<<"\n";
+    areaFile<<time_;
+    for (const auto& cell : cells_){
+       areaFile<<","<< cell->getArea();
+    }
+    areaFile<<"\n";
     // Close the file
     areaFile.close();
 }
@@ -402,7 +443,7 @@ void Simulation::writeArea(){
 void Simulation::writeCellCentroid(){
     //Open file:
     std::ostringstream dataDir;
-    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
+    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_multi_gamma_"<<convertDouble(polygons_[12]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
     if (!std::filesystem::exists(dataDir.str())){
         if(std::filesystem::create_directories(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
@@ -412,7 +453,7 @@ void Simulation::writeCellCentroid(){
         }
     }
     std::ostringstream filename;
-    filename << dataDir.str()<<"/Single_cell_Centroid_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<< ".txt";
+    filename << dataDir.str()<<"/Single_cell_Centroid_gamma_"<<convertDouble(polygons_[12]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<< ".txt";
 
     std::ofstream centroidFile;
     if (time_ ==0){
@@ -426,7 +467,11 @@ void Simulation::writeCellCentroid(){
         std::cerr << "Error opening the force file for writing!" << std::endl;
         return;
     }
-    centroidFile<<time_*timestep_<<","<< cells_[0]->getCentroid()[0]<<","<< cells_[0]->getCentroid()[1]<<","<< cells_[0]->getCentroid()[2]<<"\n";
+    centroidFile<<time_;
+    for (const auto& cell : cells_){
+       centroidFile<<","<< cell->getCentroid()[0]<<","<< cell->getCentroid()[1]<<","<< cell->getCentroid()[2];
+    }
+    centroidFile<<"\n";
     // Close the file
     centroidFile.close();
 }
@@ -434,7 +479,7 @@ void Simulation::writeCellCentroid(){
 void Simulation::writeCellGeoCentroid(){
     //Open file:
     std::ostringstream dataDir;
-    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
+    dataDir << "data/"<<getDate()<<"/"<<getDate()<<"_multi_gamma_"<<convertDouble(polygons_[12]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_;
     if (!std::filesystem::exists(dataDir.str())){
         if(std::filesystem::create_directories(dataDir.str())){
             std::cout <<"Datadir created successfully\n";
@@ -444,7 +489,7 @@ void Simulation::writeCellGeoCentroid(){
         }
     }
     std::ostringstream filename;
-    filename << dataDir.str()<<"/Single_cell_GeoCentroid_gamma_"<<convertDouble(polygons_[2]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<< ".txt";
+    filename << dataDir.str()<<"/Single_cell_GeoCentroid_gamma_"<<convertDouble(polygons_[12]->getGamma())<<"_T_"<<period_<<"_timestep_"<<convertDouble(timestep_)<<"_"<<std::setfill('0') << std::setw(3) << id_<< ".txt";
 
     std::ofstream geoCentroidFile;
     if (time_ ==0){
@@ -458,8 +503,11 @@ void Simulation::writeCellGeoCentroid(){
         std::cerr << "Error opening the force file for writing!" << std::endl;
         return;
     }
-    geoCentroidFile<<time_*timestep_<<","<< cells_[0]->getGeoCentroid()[0]<<","<< cells_[0]->getGeoCentroid()[1]<<","<< cells_[0]->getGeoCentroid()[2]<<"\n";
-    // Close the file
+    geoCentroidFile<<time_;
+    for (const auto& cell : cells_){
+       geoCentroidFile<<","<< cell->getGeoCentroid()[0]<<","<< cell->getGeoCentroid()[1]<<","<< cell->getGeoCentroid()[2];
+    }
+    geoCentroidFile<<"\n";// Close the file
     geoCentroidFile.close();
 }
 
