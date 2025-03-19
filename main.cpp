@@ -10,10 +10,13 @@
 #include <filesystem>
 #include <regex>
 #include <ctime>
+#include <unordered_set>
 void readVTKAndCreateObjects(const std::string& filePath, 
                              std::vector<Vertex*>& vertices, 
                              std::vector<Edge*>& edges, 
-                             std::vector<Polygon*>& polygons) { // Group polygons by cube_id
+                             std::vector<Polygon*>& polygons,
+                             std::vector<Cell*>& cells,
+                             double V0, double A0) { // Group polygons by cube_id
     std::ifstream file(filePath);
     if (!file.is_open()) {
         throw std::runtime_error("Could not open file " + filePath);
@@ -25,7 +28,7 @@ void readVTKAndCreateObjects(const std::string& filePath,
     std::vector<std::array<double, 3>> points;
     std::vector<std::vector<int>> polygonFaces;
     std::string keyword;
-    int numpoints = -1, numPolygons = -1;
+    int numpoints = -1, numPolygons = -1, numPolygonsLeft = -1;
 
     while (std::getline(file, line)) {
         std::istringstream iss(line);
@@ -41,6 +44,7 @@ void readVTKAndCreateObjects(const std::string& filePath,
             continue;
         } else if (keyword == "POLYGONS") {
             iss >> numPolygons; // Read the number of polygons
+            numPolygonsLeft = numPolygons;
             readingPoints = false;
             readingPolygons = true;
             keyword = "reading polygons...";
@@ -65,8 +69,8 @@ void readVTKAndCreateObjects(const std::string& filePath,
                 face.push_back(vertexId);
             }
             polygonFaces.push_back(face);
-            numPolygons--;
-            if (numPolygons == 0){
+            numPolygonsLeft--;
+            if (numPolygonsLeft == 0){
                 readingPolygons = false;
             }
         }
@@ -74,15 +78,14 @@ void readVTKAndCreateObjects(const std::string& filePath,
     file.close();
 
     //Open helper to read cells
-    std::ifstream file(filePath.substr(0,filePath.length()-4)+"_helper.txt");
-    if (!file.is_open()) {
-        throw std::runtime_error("Could not open file " + filePath);
+    std::ifstream helperFile(filePath.substr(0,filePath.length()-4)+"_helper.txt");
+    if (!helperFile.is_open()) {
+        throw std::runtime_error("Could not open file " + filePath.substr(0,filePath.length()-4)+"_helper.txt");
     }
-    std::string line;
     bool readingCells = false;
     int polyId;
     std::vector<std::vector<int>> cellStructure;
-    while (std::getline(file, line)) {
+    while (std::getline(helperFile, line)) {
         std::istringstream iss(line);
         if (!readingCells) {
             readingCells = true;
@@ -98,7 +101,8 @@ void readVTKAndCreateObjects(const std::string& filePath,
             cellStructure.push_back(cell);
         }
     }
-    file.close();
+    helperFile.close();
+    
 
     // Create Vertex objects
     for (size_t i = 0; i < points.size(); ++i) {
@@ -122,6 +126,19 @@ void readVTKAndCreateObjects(const std::string& filePath,
         }
     }
 
+    //Assign boundary designation to boundary polygons:
+    std::unordered_set<int> seenPolyIds;
+    std::vector<bool> boundPolys(numPolygons, true);
+    for (const auto& cell: cellStructure){  
+        for (int poly_id: cell){
+            if (seenPolyIds.count(poly_id)>0){
+                boundPolys[poly_id] = false;
+            }
+            else{
+                seenPolyIds.insert(poly_id);
+            }
+        }
+    }
     // Create Polygon objects and group them by cube_id
     int polygonId = 0;
     for (size_t i = 0; i < polygonFaces.size(); ++i) {
@@ -146,18 +163,32 @@ void readVTKAndCreateObjects(const std::string& filePath,
             }
         }
         // Create a polygon
-        Polygon* polygon = new Polygon(faceVertices, faceEdges, polygonId++);
-        polygons.push_back(polygon);      
+        Polygon* polygon = new Polygon(faceVertices, faceEdges, polygonId);
+        if (boundPolys[polygonId]){
+            polygon->setBoundary(true);
+        }
+        polygons.push_back(polygon);  
+        polygonId++;     
     }
 
     // Create cells
+    int cellId = 0;
     for (int i = 0; i<cellStructure.size();i++){
         const auto& thisCellStructure = cellStructure[i];
+        std::vector<Vertex*> cellVertices;
         std::vector<Polygon*> cellPolygons;
         for (int j = 0; j<thisCellStructure.size(); j++){
-            cellPolygons.push_back(polygons[thisCellStructure[j]]);
+            Polygon* polygon = polygons[thisCellStructure[j]];
+            cellPolygons.push_back(polygon);
+            for (int k = 0; k<polygon->getVertices().size();k++){
+                Vertex* vertex = polygon->getVertices()[k];
+                if (std::find(cellVertices.begin(), cellVertices.end(), vertex) == cellVertices.end()) { //Vertex not already added
+                    cellVertices.push_back(vertex);
+                }
+            }
         }
         Cell* cell = new Cell(cellVertices, cellPolygons, cellId++, V0, A0);
+        cells.push_back(cell);
     }
     
 }
@@ -202,7 +233,7 @@ std::string getDate() {
 
 
 int main() {
-    bool batchMode = true;
+    bool batchMode = false;
     if (batchMode){
         int period_inc = 50; // 1 tau = 0.5 min, inc +50 = +0.5 tau = + 0.25 min  
         double gamma = 0.5;
@@ -224,8 +255,9 @@ int main() {
                 std::vector<Vertex*> vertices;
                 std::vector<Edge*> edges;
                 std::vector<Polygon*> polygons;
+                std::vector<Cell*> cells;
                 // Initialize Simulation Parameters:
-                std::string shape = "cube";
+                std::string shape = "stacked_cubes";
                 std::string directory = "data/" + getDate(); 
                 int id = get_next_index(directory);
                 double mu = 1.0;
@@ -237,7 +269,7 @@ int main() {
                 double gamma = 2;
                 int period = 500;
                 //double KsTrailing = 10;
-                bool boundary = true;
+                bool boundary = false;
                 int midSteps = 0;
 
                 //period = 500 timesteps = 5 tau = 2.5 min
@@ -251,24 +283,23 @@ int main() {
                 bool write = true;
 
                 std::string vtkFilePath = std::string("vtk_in//")+shape+std::string(".vtk"); 
-                readVTKAndCreateObjects(vtkFilePath, vertices, edges, polygons);
-                
+                readVTKAndCreateObjects(vtkFilePath, vertices, edges, polygons, cells, V0, A0);
                 //Set gamma parameters
                 for (Polygon* polygon :polygons){
+
                     polygon->setKs(Ks);
-                    if (polygon->getId() == 2){
+                    if (polygon->getId() == 1 ||polygon->getId() == 7||polygon->getId() == 12||polygon->getId() == 17){
                         polygon->setGamma(gamma);
                     }
-                    else if (polygon->getId() == 5){
+                    else if (polygon->getId() == 3||polygon->getId() == 9 ||polygon->getId() == 14||polygon->getId() == 19){
                         polygon->setGamma(-1*gamma);
                         polygon->setKs(KsTrailing);
                     }
                 }
-                std::vector<Cell*> cells;
-                Cell* cell = new Cell(vertices, polygons, 0, V0, A0);
-                cell->setKv(Kv);
-                cell->setKa(Ka); 
-                cells.push_back(cell);
+                for (Cell* cell : cells){
+                    cell->setKv(Kv);
+                    cell->setKa(Ka);
+                }
                 std::cout << "Starting Simulation: " <<std::setfill('0') <<std::setw(3) << id<<std::endl; 
                 Simulation sim(cells, polygons, edges, vertices, id, period, timestep, numTimesteps, mu, log, write); 
                 sim.setBoundary(boundary);
@@ -295,9 +326,10 @@ int main() {
         std::vector<Vertex*> vertices;
         std::vector<Edge*> edges;
         std::vector<Polygon*> polygons;
+        std::vector<Cell*> cells;
         // Initialize Simulation Parameters:
 
-        std::string shape = "cube";
+        std::string shape = "stacked_cubes";
         std::string directory = "data/" + getDate(); 
         int id = get_next_index(directory);
         double mu = 1.0;
@@ -306,14 +338,14 @@ int main() {
         double gamma = 2.;
         double Kv = 10.;
         double Ka = 1.;
-        double Ks = 5.;
-        double KsTrailing = 5.;
+        double Ks = 1.;
+        double KsTrailing = 1.;
         double period = 500;
-        bool boundary = true;
-        int midSteps = 1000;
+        bool boundary = false;
+        int midSteps = 0;
 
         double tau = 1/(mu*Kv*V0); //0.1 
-        double timestep = 0.01*tau; 
+        double timestep = 0.01*tau;
 
         //run for 4 periods + 60 tau 
         int numTimesteps = period*4 + 100*60; //timesteps/log = timesteps/period * periods/log = 500 * 1/10 
@@ -322,24 +354,23 @@ int main() {
         bool write = true;
 
         std::string vtkFilePath = std::string("vtk_in//")+shape+std::string(".vtk"); 
-        readVTKAndCreateObjects(vtkFilePath, vertices, edges, polygons);
+        readVTKAndCreateObjects(vtkFilePath, vertices, edges, polygons,cells, V0, A0);
         
         //Set gamma parameters
         for (Polygon* polygon :polygons){
             polygon->setKs(Ks);
-            if (polygon->getId() == 2){
+            if (polygon->getId() == 1 ||polygon->getId() == 7||polygon->getId() == 12||polygon->getId() == 17){
                 polygon->setGamma(gamma);
             }
-            else if (polygon->getId() == 5){
+            else if (polygon->getId() == 3||polygon->getId() == 9 ||polygon->getId() == 14||polygon->getId() == 19){
                 polygon->setGamma(-1*gamma);
                 polygon->setKs(KsTrailing);
             }
         }
-        std::vector<Cell*> cells;
-        Cell* cell = new Cell(vertices, polygons, 0, V0, A0);
-        cell->setKv(Kv);
-        cell->setKa(Ka); 
-        cells.push_back(cell);
+        for (Cell* cell : cells){
+            cell->setKv(Kv);
+            cell->setKa(Ka);
+        }
         std::cout << "Starting Simulation: " <<std::setfill('0') <<std::setw(3) << id<<std::endl; 
         Simulation sim(cells, polygons, edges, vertices, id, period, timestep, numTimesteps, mu, log, write); 
         sim.setBoundary(boundary);
@@ -349,7 +380,7 @@ int main() {
         for (auto vertex : vertices) delete vertex;
         for (auto edge : edges) delete edge;
         for (auto polygon : polygons) delete polygon;
-        for (auto cell:cells) delete cell;
+        for (auto cell: cells) delete cell;
     }
     return 0;
 }
