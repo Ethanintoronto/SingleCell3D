@@ -8,13 +8,13 @@ def convert_decimal(decimal_str):
     return float(decimal_str.replace('p', '.'))
 
 # Set base directory and date
-date = "2025-03-10"
+date = "2025-03-19"
 data_dir = os.path.join("data", date)
 
 # Define the range of IDs (adjust these values based on how IDs are structured in the directory names)
 # Define the start and end of the ID range (e.g., from "000" to "050")
-id_start = 100  # Starting ID (inclusive)
-id_end = 199  # Ending ID (inclusive)
+id_start = 1  # Starting ID (inclusive)
+id_end = 400  # Ending ID (inclusive)
 period = 500
 
 id_range = range(id_start, id_end + 1)
@@ -24,22 +24,22 @@ x_var = r'$K_s$'
 y_var = r'$K_{sTrailing}$'
 
 x_start = 0.5    # Starting value for x
-num_x  = 10     # Ending value for x
+num_x  = 20     # Ending value for x
 x_increment = 0.5  # Increment value for x
 x_stop = x_start + x_increment * (num_x - 1)
 
 y_increment = 0.5  # Increment value for y
-num_y = 10
+num_y = 20
+y_start = 0.5
+y_stop = y_start + y_increment * (num_y - 1)
 
 
 # Lists to store extracted values
 x_values = []
 y_values = []
 displacements = []
-
 for x in np.linspace(x_start, x_stop, num_x):
-    y_start = x
-    y_stop = y_start + y_increment * (num_y - 1)
+
     for y in np.linspace(y_start, y_stop, num_y):
 
         # Use the looped values of x and y
@@ -51,14 +51,10 @@ subdirs = glob.glob(os.path.join(data_dir, f"{date}_gamma_*_T_*_timestep_*_*"))
 # Sort subdirectories by ID (assuming the ID is the last part)
 subdirs.sort(key=lambda subdir: int(subdir.split("_")[-1]))  # Sort by the second-to-last part (ID)
 
-print(f"Found {len(subdirs)} subdirectories.")
-
 for subdir in subdirs:
-    print(f"Processing: {subdir}")
 
     # Skip old directories that do not contain "_T_"
     if "_T_" not in subdir:
-        print(f"Skipping (no _T_ found): {subdir}")
         continue
         # Extract gamma, period, and ID from directory name
     parts = os.path.basename(subdir).split("_")
@@ -66,27 +62,21 @@ for subdir in subdirs:
     try:
         id_index = parts.index("0p001") + 1  # Assuming the ID is right after "timestep"
         id_str = parts[id_index]
-        
-        print(f"Extracted: ID={id_str}")
     
         id_val = int(id_str)  # Assuming ID is an integer
 
         # Check if ID is within the specified range
         if id_val not in id_range:
-            print(f"Skipping (ID {id_val} not in range): {subdir}")
             continue
         
     except (ValueError, IndexError) as e:
-        print(f"Skipping directory (failed parsing: {e}): {subdir}")
         continue  # Skip if parsing fails
     # Find the data file in the subdirectory
     file_pattern = os.path.join(subdir, "Single_cell_Centroid_gamma_*_T_*_timestep_*_*.txt")
     files = glob.glob(file_pattern)
     if not files:
-        print(f"No data file found in: {subdir}")
         continue  # Skip if no matching file found
     file = files[0]
-    print(f"Using data file: {file}")
 
     try:
         # Load data and compute displacement
@@ -137,19 +127,48 @@ for i, x in enumerate(unique_x):
 
 
 # Create plot
+plot_dir = os.path.join("plots", date)
 fig, ax = plt.subplots()
 c = ax.imshow(disp_matrix, aspect='auto', origin='lower', cmap='jet',
               extent=[min(unique_x), max(unique_x), min(unique_y), max(unique_y)])
-ax.set_xlabel(x_var, fontsize="large")
-ax.set_ylabel(y_var, fontsize="large")
-ax.set_title("2D Scan Displacement")
-fig.colorbar(c, label=r'Displacement ($\mu$m)')
+ax.set_xlabel(x_var, fontsize=18)
+ax.set_ylabel(y_var, fontsize=18)
+#ax.set_title("2D Scan Displacement")
+cbar = fig.colorbar(c)
+cbar.set_label(r'Displacement ($\mu$m)', fontsize =18)
+fig.savefig(plot_dir+"\\"+date+"_"+str(id_start)+"_"+str(id_end)+"_"+y_var+"_"+x_var+"_imshow")
 
-fig2, ax2 = plt.subplots()
-c2 = ax2.contourf(xx, yy,disp_matrix,levels = 8, cmap = 'jet')
-ax2.set_xlabel(x_var, fontsize="large")
-ax2.set_ylabel(y_var+"/"+x_var, fontsize="large")
-ax2.set_title("2D Scan Displacement")
-fig2.colorbar(c2, label=r'Displacement ($\mu$m)')
+fig3, ax3 = plt.subplots()
+scatter = ax3.scatter(y_values/x_values,displacements,c = x_values,cmap = "jet")
+cbar3 = fig3.colorbar(scatter)
+cbar3.set_label("Ks", fontsize=18)
+ax3.set_ylabel(r'Displacement ($\mu$m)', fontsize=18)
+ax3.set_xlabel(y_var+"/"+x_var, fontsize=18)
+fig3.savefig(plot_dir+"\\"+date+"_"+str(id_start)+"_"+str(id_end)+"_"+y_var+"_"+x_var+"_scatter")
+
+# Add a new plot where ks/ks_trailing is plotted vs displacement as a line for each ks
+fig4, ax4 = plt.subplots()
+unique_xs = np.unique(x_values)
+for ks in unique_xs:
+    if int(ks)!=ks:
+        continue 
+    mask = (x_values == ks) & (y_values>ks)
+    sorted_indices = np.argsort(y_values[mask] / x_values[mask])
+    ax4.plot((y_values[mask] / x_values[mask])[sorted_indices], displacements[mask][sorted_indices], label=f'Ks={ks}')
+ax4.set_xlabel(y_var + "/" + x_var, fontsize=18)
+ax4.set_ylabel(r'Displacement ($\mu$m)', fontsize=18)
+ax4.legend(fontsize=10)
+fig4.savefig(plot_dir+"\\"+date+"_"+str(id_start)+"_"+str(id_end)+"_"+y_var+"_"+x_var)
+
+fig5, ax5 = plt.subplots()
+unique_xs = np.unique(x_values)
+for ks in unique_xs:
+    mask = (x_values == ks) & (y_values>=ks)
+    sorted_indices = np.argsort(y_values[mask] / x_values[mask])
+    ax5.plot(y_values[mask][sorted_indices], displacements[mask][sorted_indices], label=f'Ks={ks}')
+ax5.set_xlabel(y_var, fontsize=18)
+ax5.set_ylabel(r'Displacement ($\mu$m)', fontsize=18)
+ax5.legend(fontsize=10, loc = "upper right")
+fig5.savefig(plot_dir+"\\"+date+"_"+str(id_start)+"_"+str(id_end)+"_"+y_var)
 # Show the plot
 plt.show()

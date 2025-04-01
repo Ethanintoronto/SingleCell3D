@@ -7,13 +7,13 @@ from datetime import datetime
 def convert_decimal(decimal_str):
     return float(decimal_str.replace('p', '.'))
 # Set base directory and date
-date = "2025-03-10"
+date = "2025-03-22"
 data_dir = os.path.join("data", date)
 
 # Define the range of IDs (adjust these values based on how IDs are structured in the directory names)
 # Define the start and end of the ID range (e.g., from "000" to "050")
-id_start = 0  # Starting ID (inclusive)
-id_end = 99  # Ending ID (inclusive)
+id_start = 100  # Starting ID (inclusive)
+id_end = 199  # Ending ID (inclusive)
 
 id_range = range(id_start,id_end+1)
 
@@ -117,8 +117,9 @@ for i, gamma in enumerate(unique_gammas):
 fig, ax = plt.subplots()
 c = ax.imshow(disp_matrix, aspect='auto', origin='lower', cmap='jet', 
               extent=[min(unique_periods), max(unique_periods), min(unique_gammas), max(unique_gammas)])
-ax.set_xlabel(r'T ($\tau$)', fontsize="large")
-ax.set_ylabel(r'$\gamma_0$', fontsize="large")
-ax.set_title("Cell Displacement")
-fig.colorbar(c, label=r'Displacement ($\mu$m)')
+ax.set_xlabel(r'T ($\tau$)', fontsize=18)
+ax.set_ylabel(r'$\gamma_0$', fontsize=18)
+#ax.set_title("Cell Displacement")
+cbar = fig.colorbar(c)
+cbar.set_label(r'Displacement ($\mu$m)', fontsize =18)
 plt.show()
