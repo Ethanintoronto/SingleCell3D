@@ -147,7 +147,7 @@ ax3.set_xlabel(y_var+"/"+x_var, fontsize=18)
 fig3.savefig(plot_dir+"\\"+date+"_"+str(id_start)+"_"+str(id_end)+"_"+y_var+"_"+x_var+"_scatter")
 
 # Add a new plot where ks/ks_trailing is plotted vs displacement as a line for each ks
-fig4, ax4 = plt.subplots()
+fig4, ax4 = plt.subplots(figsize = (6.4, 5.2))
 unique_xs = np.unique(x_values)
 for ks in unique_xs:
     if int(ks)!=ks:
