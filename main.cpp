@@ -10,6 +10,8 @@
 #include <filesystem>
 #include <regex>
 #include <ctime>
+
+// Read initial configuration from vtk file format and generate Vertex, Edge, Polygon Objects
 void readVTKAndCreateObjects(const std::string& filePath, 
                              std::vector<Vertex*>& vertices, 
                              std::vector<Edge*>& edges, 
@@ -116,6 +118,8 @@ void readVTKAndCreateObjects(const std::string& filePath,
         polygons.push_back(polygon);      
     }
 }
+
+// Returns the simulation ID based on the ID of the last simualtion in the same data subdirectory for the given date
 int get_next_index(const std::string& directory) {
     std::regex pattern(R"(_(\d{3})$)"); // Matches "_000", "_001", etc. at the end of filenames
     if (!std::filesystem::exists(directory) || std::filesystem::is_empty(directory)) {
@@ -138,6 +142,7 @@ int get_next_index(const std::string& directory) {
     return max_index + 1;
 }
 
+//Gets the date in YYYY-MM-DD format
 std::string getDate() {
     // Get the current time
     std::time_t t = std::time(nullptr);
@@ -155,33 +160,39 @@ std::string getDate() {
     return date_str;
 }
 
+//Create Cells and Simulation and run Simulation. 
 int main() {
     bool batchMode = true;
     if (batchMode){
-        int period_inc = 50; // 1 tau = 0.5 min, inc +50 = +0.5 tau = + 0.25 min  
-        double gamma = 0.5;
-        double gamma_inc = 0.25;
-        int num_periods = 10;
-        int num_gammas = 10;
+        //int period_inc = 50; // 1 tau = 0.5 min, inc +50 = +0.5 tau = + 0.25 min  
+        //double gamma = 0.5;
+        //double gamma_inc = 0.25;
+        
+        int num_param1 = 10;
+        int num_param2 = 10;
 
         double Ks = 0.5;
         double Ks_inc = 0.5;
         double KsTrailing_inc = 0.5;
-        for (int i = 0; i<num_gammas; i++){
+
+        for (int i = 0; i<num_param1; i++){
             
             
             //int period = 250;
             double KsTrailing = Ks;
 
 
-            for (int j = 0; j<num_periods; j++){
+            for (int j = 0; j<num_param2; j++){
                 std::vector<Vertex*> vertices;
                 std::vector<Edge*> edges;
                 std::vector<Polygon*> polygons;
+
                 // Initialize Simulation Parameters:
                 std::string shape = "cube";
                 std::string directory = "data/" + getDate(); 
                 int id = get_next_index(directory);
+
+                //Comment out params being scanned below and define them outside of respective loops
                 double mu = 1.0;
                 double V0 = 1.; 
                 double A0 = 6.;
@@ -235,13 +246,9 @@ int main() {
                 for (auto polygon : polygons) delete polygon;
                 for (auto cell:cells) delete cell;
 
-
-                //period += period_inc;
                 KsTrailing+=KsTrailing_inc;
             }
 
-
-            //gamma+= gamma_inc;
             Ks+= Ks_inc;
         }
     }
