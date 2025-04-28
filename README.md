@@ -27,8 +27,6 @@ Generates the initial configuration from specified .vtk file in `vtk_in/`, assig
 
 To construct an instance of Simulation, you must pass the constructor vectors of pointers for all Cells Polygons Edges and Vertices.
 
-`int period` is the period of the oscillations in timesteps.
-
 `double timestep` is the length of one timestep $\Delta t$.
 
 `int numTimesteps` is teh total number of timesteps to run.
