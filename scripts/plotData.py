@@ -9,13 +9,13 @@ plt.rcParams['font.sans-serif'] = ['Arial'] # Choose preferred fonts
 
 dir  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 date = datetime.now().strftime("%Y-%m-%d")
-date = "2025-03-05"
+date = "2025-03-03"
 
 
 period = "500"
-gamma = "2"
+gamma = "0"
 timestep = "0p001"
-id = "001"
+id = "107"
 base = "_gamma_"+gamma+"_T_"+period+"_timestep_"+timestep+"_"+id
 run = "\\data\\"+date+"\\"+date+base+"\\"
 tests =  ["Area", "Centroid", "Volume", "MaxForce", "GeoCentroid"]
@@ -51,9 +51,9 @@ for index, file in enumerate(filenames):
     for i in range(len(indep[0])):
         plt.figure()
         plt.plot(time, indep[:,i])
-        plt.xlabel(r'Time ($\tau$)', fontsize = 14)
-        plt.ylabel(plotLabels[i], fontsize = 14)
-        plt.title(str(saveLabels[i])+" with Stiff Boundary (10 midsteps)", fontsize = 18)
+        plt.xlabel(r'Time ($\tau$)', fontsize = 18)
+        plt.ylabel(plotLabels[i], fontsize = 18)
+        plt.title(str(saveLabels[i])+" for Shrinking Cell", fontsize = 24)
         if not os.path.exists("plots\\"+ date+"\\"+date+base+"\\"):
             os.makedirs("plots\\"+ date+"\\"+date+base)
         plt.savefig("plots\\"+ date+"\\"+date+base+"\\"+date+base+saveLabels[i])
